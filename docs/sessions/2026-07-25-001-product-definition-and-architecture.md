@@ -10,7 +10,7 @@
 | Verantwortlich | Roger Tobler |
 | Beteiligte | Roger Tobler, Codex, externe Reviews durch Claude und Gemini |
 | Ausgangscommit | Projektinitialisierung vor `302f5f1` |
-| Abschlusscommit | wird mit diesem Sessionbericht ergänzt |
+| Abschlusscommit | `6e8cb38` |
 
 ## Ziel
 
@@ -483,7 +483,8 @@ Noch nicht durchgeführt:
 - `13807e4`: native CLI-/tmux-Tunnelarchitektur verbindlich beschrieben
 - `d6a53db`: ausführlicher Zweitmeinungsauftrag und Baseline-Audit
 - `d18099e`: Terminal-I/O-Architektur nach externem Review gehärtet
-- Abschlusscommit dieser Session: wird nach Erstellung des Berichts ergänzt
+- `6e8cb38`: Sessionjournal eingeführt und host-native Workspace-Parität
+  verbindlich festgelegt
 
 ## Offene Punkte
 
