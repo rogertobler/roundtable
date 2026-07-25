@@ -43,7 +43,8 @@ Benutzernachrichten werden literal in dieselbe Session zurückgeschrieben.
 Öffnet der Benutzer die Session lokal mit tmux, sieht er den nativen
 Claude-/Codex-Chatverlauf einschließlich der über Telegram gesendeten
 Nachrichten. Er kann lokal oder über den Messenger im selben Kontext
-weiterarbeiten.
+weiterarbeiten. Der Wechsel ist kontrolliert: Beide Oberflächen sehen denselben
+Prozess, schreiben aber nicht gleichzeitig in dasselbe Pane.
 
 ## Produktversprechen
 
@@ -219,6 +220,9 @@ Weitere wichtige Qualitätsmerkmale:
   sein.
 - Eine fehlende oder mehrdeutige Zuordnung führt zu einer Auswahl, nicht zu
   einer geratenen Zustellung.
+- Lokale und mobile Eingaben dürfen nicht zeichenweise vermischt werden.
+- Eine technisch unklare Teilzustellung darf nicht automatisch wiederholt
+  werden.
 - Der Standardbetrieb darf keine Secrets in Telegram offenlegen.
 - Installation und Update müssen für Nicht-Projektentwickler handhabbar sein.
 - Fehler müssen konkrete, sichere Wiederherstellungsaktionen anbieten.

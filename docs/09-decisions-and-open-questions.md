@@ -178,6 +178,62 @@ Agenten-Hooks, strukturierte Events oder APIs dürfen Hinweise auf Status,
 Turn-Ende und Approvals liefern. Sie dürfen weder Benutzertext an der nativen
 CLI vorbeiführen noch einen zweiten Agentenverlauf erzeugen.
 
+### D-019: Kein gleichzeitiges Schreiben
+
+Status: verbindlich
+
+Lokales Terminal und Messenger dürfen dieselbe Session abwechselnd bedienen,
+aber nicht gleichzeitig Zeichen in dasselbe Pane schreiben. Solange ein
+normaler interaktiver tmux-Client attached ist, hält Roundtable mobile Eingaben
+standardmäßig zurück. Der Benutzer kann lokal detachen oder die mobile
+Steuerung ausdrücklich übernehmen. Eine Übernahme detached die normalen
+Clients nach Bestätigung und prüft vor dem Schreiben erneut, dass kein
+interaktiver Client attached ist.
+
+### D-020: Direkter Agentenprozess ohne Shell-Fallback
+
+Status: verbindlich
+
+Die Agenten-CLI läuft direkt als Pane-Prozess. Endet sie, darf eine spätere
+Messenger-Eingabe nicht an einem unerwarteten Shell-Prompt landen. Ein
+beendetes Pane kann für Diagnose sichtbar bleiben, ist aber nicht schreibbar.
+
+### D-021: Unklare Zustellung wird nicht wiederholt
+
+Status: verbindlich
+
+Roundtable persistiert die Stufen jedes Pane-Writes. Nach einem Absturz ab
+Beginn des Schreibens kann genau einmal erfolgte PTY-Zustellung nicht immer
+bewiesen werden. Der Zustand wird dann `delivery_uncertain`; es gibt keinen
+automatischen Retry. Der Benutzer entscheidet anhand von Eingabe und
+CLI-Snapshot.
+
+### D-022: Reattach über Marker und stabile IDs
+
+Status: verbindlich
+
+Roundtable speichert stabile tmux-Session-/Pane-IDs und setzt eine interne UUID
+sowie Runtime-Generation als tmux User Options. Nur bei übereinstimmenden
+Markern wird automatisch wiederverbunden. Prozess, Startbefehl und
+Arbeitsverzeichnis sind zusätzliche Evidenz, keine alleinige Identität.
+
+### D-023: Outputstrategie bleibt Spike-Entscheidung
+
+Status: vorgeschlagen
+
+`pipe-pane` und tmux Control Mode werden praktisch verglichen. Control Mode
+liefert strukturierte tmux-Ereignisse, aber sein `%output` bleibt roher
+Terminaloutput. Er wird deshalb nicht vorab als Lösung für Nachrichtengrenzen,
+Echo oder TUI-Rendering festgelegt.
+
+### D-024: Deterministische Terminalgröße
+
+Status: verbindlich
+
+Jede Runtime besitzt feste, gespeicherte Terminalmaße. Lokales Attach darf sie
+nicht still verändern. Der konkrete Standardwert wird im technischen Spike
+festgelegt.
+
 ## Noch offene Produktfragen
 
 ### OQ-P-001: Bestätigung erfolgreicher freier Nachrichten
@@ -235,6 +291,10 @@ PTY-Implementierung Voraussetzung.
 
 Festzulegen:
 
+- `pipe-pane` oder Control Mode als fortlaufende Quelle,
+- Verhalten von `%output`, Flow Control und Reattach,
+- Bedarf eines eigenen Control-Mode-Clients pro gleichzeitig beobachteter
+  tmux-Session,
 - `pipe-pane`-Logformat,
 - Startzeitpunkt,
 - Rotation,
@@ -243,6 +303,9 @@ Festzulegen:
 - Rekonstruktion stabiler Ausgaben,
 - ausreichend große tmux-History,
 - literal Buffer/Paste für Messengertext.
+
+Control Mode ist keine semantische Agentenschnittstelle und löst die
+Terminalemulation nicht automatisch.
 
 ### OQ-T-003: Telegram Update-Modus
 
@@ -267,8 +330,13 @@ tmux-Monitoring degradieren. Der Nachrichtenpfad bleibt immer tmux.
 ### OQ-T-005: Terminalparser
 
 Zu entscheiden ist, welche etablierte Terminalemulation Raw Streams in einen
-Screen Snapshot umwandelt. Ein eigener ANSI-Parser sollte vermieden werden,
-wenn eine gepflegte Bibliothek die nötigen Plattformen unterstützt.
+Screen Snapshot umwandelt. Zu prüfen sind insbesondere vollständige
+Terminalemulatoren und die `avt`-Implementierung aus dem asciinema-Projekt.
+Asciinema selbst ist primär Recorder/Player und nicht automatisch der passende
+Parser. Lizenz, Go-Integration, Alternate Screen, Unicode und
+Resize-Rekonstruktion sind Teil der Bewertung. Ein eigener ANSI-Parser sollte
+vermieden werden, wenn eine gepflegte Bibliothek die nötigen Plattformen
+unterstützt.
 
 ### OQ-T-006: Verschlüsselung lokaler Daten
 
@@ -312,6 +380,22 @@ Vor Implementierung prüfen:
 
 Der Transportadapter muss Capability-Unterschiede sichtbar machen.
 
+### OQ-T-010: Eingabe- und Echo-Matrix
+
+Für jede unterstützte Agenten-/CLI-Version sind festzulegen:
+
+- Verhalten bei Singleline und Multiline,
+- Bracketed-Paste-Unterstützung,
+- Abschlusstaste,
+- Eingabe-Echo,
+- Composer-Clear-Verhalten,
+- Picker und Alternate Screen,
+- maximal sicher getestete Eingabegröße.
+
+Unbekannte Kombinationen degradieren auf konservative Bedienung und dürfen
+nicht mit erzwungenem `TERM=dumb`, `CI=true` oder globalem `stty -echo`
+verändert werden.
+
 ## Entscheidungsprozess
 
 Künftige wesentliche Entscheidungen erhalten einen datierten Eintrag unter
@@ -344,8 +428,11 @@ werden:
 3. SQLite-Treiber und Migrationen,
 4. tmux-Befehls- und Outputstrategie,
 5. Terminalparser,
-6. Verträge für Transport, CLI-Definition und Session-Tunnel,
-7. Dienst- und Datenpfade,
-8. Secret-Store-Fallback,
-9. Testfixtures für Claude und Codex,
-10. Packaging des ersten Linux-Builds.
+6. sichere Singleline-/Multiline-Eingabematrix,
+7. Zustellungszustandsautomat und Crash-Recovery,
+8. Reattach-Marker und lokale Schreibsperre,
+9. Verträge für Transport, CLI-Definition und Session-Tunnel,
+10. Dienst- und Datenpfade,
+11. Secret-Store-Fallback,
+12. Testfixtures für Claude und Codex,
+13. Packaging des ersten Linux-Builds.

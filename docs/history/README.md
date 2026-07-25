@@ -3,9 +3,9 @@
 Dieses Verzeichnis nimmt künftige datierte Änderungen an der
 Roundtable-Baseline auf.
 
-Der Initialstand vom 25. Juli 2026 besitzt keinen historischen
-Änderungseintrag. Die Dokumente im übergeordneten Verzeichnis beschreiben
-ausschließlich den aktuell gültigen Soll-Zustand.
+Der Initialstand wurde am 25. Juli 2026 angelegt. Seitdem erklären datierte
+Einträge jede Änderung an dieser Baseline. Die Dokumente im übergeordneten
+Verzeichnis beschreiben ausschließlich den aktuell gültigen Soll-Zustand.
 
 Für eine spätere Änderung wird eine Datei nach diesem Muster angelegt:
 

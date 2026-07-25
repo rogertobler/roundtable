@@ -20,7 +20,8 @@ Nachrichten manuell einer Session zuordnen zu müssen.
 Roundtable führt keinen eigenen Agentendialog. Es liest Ausgaben aus der echten
 CLI-Session und schreibt Benutzerantworten in genau diese Session zurück. Wer
 die tmux-Session lokal öffnet, sieht denselben nativen Chatverlauf und kann dort
-nahtlos weiterschreiben.
+nahtlos weiterschreiben. Lokales Terminal und Messenger schreiben dabei
+kontrolliert abwechselnd, nie gleichzeitig in dasselbe Pane.
 
 ## Status
 
@@ -56,6 +57,10 @@ Besonders relevant:
   Sessionstarts ändern diesen Default nicht; nur der Benutzer kann ihn
   wechseln.
 - Roundtable schreibt Nachrichten und Freigaben nicht um.
+- Ein attachter lokaler tmux-Client sperrt mobile Writes, bis der Benutzer
+  lokal detached oder eine kontrollierte mobile Übernahme bestätigt.
+- Eine nach einem Teilabsturz unklare Pane-Zustellung wird nicht automatisch
+  wiederholt.
 - Agenten-APIs, Hooks und strukturierte Events dürfen höchstens optionale
   Erkennungshilfen sein und bilden keinen zweiten Nachrichtenpfad.
 - Linux, macOS und Windows sind Zielplattformen.

@@ -98,7 +98,9 @@ gewählt und ist im normalen Session-Menü keine Benutzerentscheidung.
 
 Nach Bestätigung legt Roundtable eine echte tmux-Session an, wechselt in das
 freigegebene Arbeitsverzeichnis und startet darin die ausgewählte lokal
-installierte Agenten-CLI. Roundtable eröffnet keinen separaten API-Dialog.
+installierte Agenten-CLI als direkten Pane-Prozess. Endet die CLI, darf das
+Pane nicht unbemerkt auf eine interaktive Shell zurückfallen. Roundtable
+eröffnet keinen separaten API-Dialog.
 
 ### FR-SESS-002: Agent pro Session
 
@@ -196,8 +198,12 @@ Roundtable soll bestehende Sessions erkennen und übernehmen können, sofern das
 Session Backend eine sichere Zuordnung und Ein-/Ausgabe erlaubt.
 
 Eine fremde tmux-Session darf nicht allein aufgrund ihres Namens übernommen
-werden. Die Übernahme erfordert Bestätigung und speichert Runtime-ID,
-Arbeitsverzeichnis und Agentenzuordnung.
+werden. Roundtable-eigene Sessions tragen eine unveränderliche interne UUID als
+tmux-Metadatum. Die Wiederverbindung prüft mindestens diese UUID, die
+gespeicherten tmux-Session-/Pane-IDs, die Runtime-Generation und den
+Prozesszustand. Arbeitsverzeichnis, Startbefehl und Prozessbaum dienen als
+zusätzliche Evidenz. Eine Kollision wird als Fehler angezeigt und niemals
+automatisch übernommen.
 
 ### FR-SESS-008: Terminalwechsel
 
@@ -209,6 +215,15 @@ Eine über Telegram gesendete Nachricht muss nach erfolgreicher Zustellung in
 der lokal geöffneten CLI-Session sichtbar sein. Eine lokale Eingabe muss vom
 Roundtable-Outputpfad erkannt und entsprechend dem Abonnement in die zentrale
 Inbox geleitet werden.
+
+Lokales und mobiles Arbeiten dürfen zeitlich abwechseln, aber nicht
+unkontrolliert gleichzeitig in dasselbe Pane schreiben. Solange ein normaler
+interaktiver tmux-Client attached ist, hält Roundtable Messenger-Eingaben
+standardmäßig in der Queue. Der Benutzer kann den lokalen Client detachen oder
+die mobile Steuerung ausdrücklich übernehmen. Eine Übernahme detached nach
+Bestätigung die normalen Clients dieser Session und prüft den Zustand erneut,
+bevor geschrieben wird. Roundtable darf Zeichenfolgen beider Quellen niemals
+zusammenführen.
 
 ### FR-SESS-009: Startaufgabe
 
@@ -303,12 +318,19 @@ Roundtable unterscheidet mindestens:
 - empfangen,
 - Ziel aufgelöst,
 - zur Zustellung eingeplant,
+- Vorbedingungen geprüft,
+- Schreibvorgang begonnen,
 - an Runtime geschrieben,
+- Abschlusstaste gesendet,
+- Zustellung unklar,
 - fehlgeschlagen,
 - vom Benutzer abgebrochen.
 
 Ein Häkchen in Telegram darf nicht fälschlich bedeuten, dass der Agent die
-Eingabe semantisch verarbeitet hat.
+Eingabe semantisch verarbeitet hat. Stürzt Roundtable nach Beginn des
+Pane-Schreibens ab, darf es die Eingabe nicht blind wiederholen. Kann der
+Zustand nicht sicher rekonstruiert werden, wird er als `delivery_uncertain`
+markiert und mit CLI-Snapshot sowie expliziten Aktionen angezeigt.
 
 ## Agentenausgaben
 
@@ -322,6 +344,13 @@ Für tmux verwendet Roundtable einen kontinuierlichen Outputpfad, beispielsweise
 `pipe-pane`, und einen Bildschirm-Snapshot über `capture-pane`. Der
 kontinuierliche Stream bewahrt Inhalt; der Snapshot hilft bei Vollbild-TUIs,
 Approvals und Wiederverbindung.
+
+Der technische Spike vergleicht `pipe-pane` mit tmux Control Mode. Control Mode
+kann Lebenszyklus- und Output-Ereignisse strukturierter liefern; sein
+`%output` bleibt jedoch roher Pane-Output und definiert weder
+Agentenantwortgrenzen noch einen semantischen Status. Deshalb ersetzt Control
+Mode weder Terminalemulation noch Stabilisierung und wird erst nach Messungen
+als verbindlicher Collector gewählt.
 
 ### FR-OUT-002: Transportaufbereitung
 
@@ -437,15 +466,28 @@ Weitere Tasten können über einen erweiterten Modus angeboten werden.
 Text und abschließende Taste werden getrennt modelliert. Dadurch kann
 Roundtable Text ohne Enter einfügen oder ausschließlich eine Taste senden.
 
+Vor jedem Schreiben prüft Roundtable Runtime-Generation, tmux-Metadaten,
+Pane-Lebenszustand, erwarteten Vordergrundprozess und lokale Attach-Sperre.
+Messengertext wird über einen tmux-Buffer aus Standard Input geladen und nie in
+einen Shellstring interpoliert. Bracketed Paste wird nur verwendet, wenn die
+Zielanwendung diesen Modus tatsächlich aktiviert hat. Zeilenumbrüche und
+Mehrzeilen-Paste erhalten pro unterstützter Agentenversion eine getestete
+Strategie; unbekannte Kombinationen werden nicht automatisch mit Enter
+ausgeführt.
+
 ### FR-TERM-004: Konkurrenz
 
-Wenn der Benutzer gleichzeitig lokal und über Telegram schreibt, serialisiert
-Roundtable nur seine eigenen Eingaben. Die UI weist auf eine aktive lokale
-Verbindung hin, sofern das Session Backend sie erkennen kann.
+Wenn ein normaler lokaler tmux-Client attached ist, schreibt Roundtable
+standardmäßig keine Messenger-Eingabe in dieses Pane. Die Eingabe bleibt
+sichtbar als wartend in der Queue, bis der lokale Client detached wurde oder
+der Benutzer die mobile Steuerung ausdrücklich übernimmt. Die Übernahme
+detached normale Clients kontrolliert und schreibt erst nach einer erneuten
+Prüfung.
 
 Lokale Eingaben dürfen nicht zu einem getrennten Verlauf führen. Roundtable
 beobachtet weiterhin dieselbe CLI-Ausgabe und leitet daraus entstehende
-Agentenantworten in die Inbox.
+Agentenantworten in die Inbox. Eine reine Zeitheuristik wie „seit X Sekunden
+keine Eingabe“ gilt nicht als verlässliche Sperre.
 
 ### FR-TERM-005: Nativer Verlauf
 
@@ -453,6 +495,13 @@ Roundtable konfiguriert eine ausreichend große tmux-History und speichert den
 Raw Output separat. Lokales Attach zeigt den echten nativen CLI-Zustand; der
 vollständige lokale Raw-Verlauf bleibt auch dann abrufbar, wenn die sichtbare
 tmux-Scrollback-Grenze erreicht wurde.
+
+### FR-TERM-006: Deterministische Terminalgröße
+
+Roundtable weist jeder Runtime eine gespeicherte, konfigurierbare virtuelle
+Terminalgröße zu. Ein lokales Attach darf diese Größe nicht unbemerkt ändern.
+Änderungen werden kontrolliert vorgenommen, gespeichert und dem Output
+Processor als neue Rendergeneration gemeldet.
 
 ## Verlauf und Audit
 

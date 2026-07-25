@@ -91,6 +91,64 @@ Zu prüfen:
 - ob Fork, Teilübernahme oder eigenständige Implementierung langfristig
   sinnvoller ist.
 
+## Codex Telegram Bridge
+
+Link:
+
+- <https://github.com/ssamssae/codex-telegram-bridge>
+
+Relevanz:
+
+- Telegram-Fernsteuerung einer sichtbaren Codex-TUI in tmux,
+- Messengertext landet in derselben sichtbaren CLI-Session,
+- Codex-JSONL als strukturierter Hinweis auf User- und Final-Answer-Ereignisse,
+- `capture-pane` für sichtbare Approvals und Auswahlmenüs,
+- Cursorpersistenz, Restart-Backfill und Benutzer-Services,
+- WSL/tmux sowie ein eingeschränkter nativer Windows-Exec-Modus.
+
+Abgrenzung:
+
+Das Projekt ist bewusst Codex-spezifisch und steuert eine Codex-Session. Es
+besitzt nicht Roundtables gemeinsame Inbox mit Reply-Routing zwischen mehreren
+gleichzeitigen Claude-, Codex- und späteren Agentensessions.
+
+Zu prüfen:
+
+- Trennung von JSONL-Ereignissen und sichtbarem TUI-Prompt,
+- Eingabe- und Composer-Behandlung,
+- Echo-, Cursor- und Restart-Logik,
+- Approval-/Picker-Erkennung,
+- plattformspezifische Dienstinstallation.
+
+## cc-telegram-bridge
+
+Link:
+
+- <https://github.com/cloveric/cc-telegram-bridge>
+
+Relevanz:
+
+- Claude Code und Codex CLI über Telegram,
+- mehrere isolierte Bot-/Agenteninstanzen,
+- Session Resume,
+- Agent-Bus und Multi-Agent-Workflows,
+- unterschiedliche Approval-Semantik der verwendeten CLI-Modi.
+
+Abgrenzung:
+
+Das Projekt führt Agenten über native CLI-Harnesses und getrennte
+Botinstanzen. Roundtable definiert einen gemeinsamen Chat, in dem die
+Ursprungsnachricht per Reply-Mapping die konkrete Session auswählt. Für Codex
+verwendet Roundtable bewusst die interaktive TUI im tmux-Tunnel und nicht den
+einmaligen `codex exec`-Pfad.
+
+Zu prüfen:
+
+- Session- und Queue-Lebenszyklus,
+- Recovery- und Kostenbegrenzung,
+- Agent-zu-Agent-Audit,
+- Unterschiede zwischen interaktiver CLI und Exec-Modus.
+
 ## amux
 
 Link:
@@ -192,6 +250,61 @@ daher kein Bestandteil des Roundtable-Tunnels. Die Implementierung ist als
 Referenz für Pairing, Sender-Allowlist und Messenger-UX relevant. Davon
 getrennte Claude-Hooks können optional als Sensoren dienen, ohne Nachrichten an
 tmux vorbeizuführen.
+
+## Technische Referenzen
+
+### tmux Control Mode
+
+Links:
+
+- <https://github.com/tmux/tmux/wiki/Control-Mode>
+- <https://man.openbsd.org/tmux>
+
+Control Mode liefert strukturierte tmux-Kommandorückgaben und
+Lebenszyklusereignisse. `%output` enthält dennoch rohe Pane-Bytes und keine
+Agentenantwortgrenzen. Roundtable vergleicht ihn im Spike mit `pipe-pane`,
+statt ihn ungeprüft als vollständige Outputlösung festzulegen.
+
+tmux User Options, stabile Session-/Pane-IDs, `pane_dead`, `pane_pid`,
+Client-Metadaten und kontrollierte Buffer-Pastes sind direkte Bausteine für
+Reattach und Eingabesicherheit.
+
+### Codex App Server
+
+Link:
+
+- <https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md>
+
+Der App Server besitzt einen strukturierten JSON-RPC-Dialog einschließlich
+serverinitiierter Approval-Anfragen. Er widerlegt die pauschale Annahme, Codex
+könne nur pro Turn Freigaben vermitteln. Roundtable verwendet ihn trotzdem
+nicht als Hauptpfad, weil dann nicht mehr die echte interaktive Codex-TUI in
+tmux der einzige Gesprächsverlauf wäre. Er bleibt Referenz für Zustände und
+Approval-Lebenszyklen.
+
+### Terminalemulation
+
+Links:
+
+- <https://github.com/asciinema/asciinema>
+- <https://github.com/asciinema/avt>
+
+Asciinema ist primär Recorder, Streamer und Player. Die dazugehörige
+Virtual-Terminal-Implementierung `avt` ist für die Screen-Rekonstruktion
+direkter relevant. Vor einer Nutzung sind Lizenz, Rust-/Go-Integration,
+Alternate Screen, Unicode und Resize-Verhalten zu prüfen.
+
+### Go-tmux-Wrapper
+
+Link:
+
+- <https://github.com/owenthereal/tmux>
+
+Der Wrapper kann als API-Referenz untersucht werden. Sein geringer
+Release-/Nutzungsnachweis reicht jedoch nicht für die Vorentscheidung
+„produktionsreif“. Ein kleiner interner, streng typisierter tmux-Adapter kann
+weniger Risiko tragen, insbesondere wenn Control Mode separat implementiert
+werden muss.
 
 ## Schlussfolgerung
 

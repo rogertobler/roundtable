@@ -176,13 +176,24 @@ Roundtable prüft:
 - Projektpfad ist erlaubt,
 - Modell- und Startargumente sind gültig.
 
-Danach werden tmux-Session, Output Capture und Agenten-CLI gestartet.
+Danach werden tmux-Session, Output Capture und Agenten-CLI als direkter
+Pane-Prozess ohne Shell-Fallback gestartet. Roundtable setzt interne
+Session-/Runtime-Marker als tmux User Options und feste Terminalmaße.
 
 ## Inhaltstreue Ein- und Ausgabe
 
 Messengertext wird literal in die CLI geschrieben, beispielsweise über einen
 tmux-Buffer mit anschließendem Paste und separatem Enter. Roundtable darf
 Messengertext niemals als Shellcode interpretieren.
+
+Vor jedem Write prüft Roundtable Runtime-Marker, Pane-Zustand,
+Vordergrundprozess und normale interaktive tmux-Clients. Bracketed Paste wird
+nur verwendet, wenn die Anwendung diesen Modus aktiviert hat. Multiline wird
+pro Agentenversion getestet und bei unbekannter Semantik nicht automatisch
+ausgeführt.
+
+Eine mobile Übernahme detached normale lokale Clients erst nach ausdrücklicher
+Bestätigung und prüft vor dem Write erneut.
 
 Die CLI-Ausgabe wird inhaltstreu weitergeleitet. Erlaubte technische
 Aufbereitung:
@@ -199,9 +210,13 @@ Nachrichtenpfads.
 
 Für die Erfassung sind vorgesehen:
 
-- `tmux pipe-pane` für den fortlaufenden Raw Stream,
+- `tmux pipe-pane` oder tmux Control Mode als im Spike zu vergleichender
+  fortlaufender Raw Stream,
 - `tmux capture-pane` für den aktuellen Screen State,
 - lokale append-only Logs mit Output-Cursor.
+
+Control Mode liefert strukturierte tmux-Ereignisse, aber auch dort bleibt
+`%output` roher Terminaloutput ohne Agentenantwortgrenzen.
 
 ## Rückfragen und Freigaben
 
@@ -280,6 +295,10 @@ SQLite speichert Routing, Default, Sessions, Input-Idempotenz, Output-Cursor,
 Abonnements und Audit. Die Datenbank ist nicht der maßgebliche
 Agentengesprächskontext.
 
+Pane-Writes besitzen persistierte Zwischenzustände. Ist nach einem Absturz
+unklar, ob Text oder Enter angekommen sind, wird `delivery_uncertain`
+angezeigt und niemals automatisch erneut gesendet.
+
 ## Sicherheit
 
 - nur freigegebene Messenger-Benutzer,
@@ -288,6 +307,9 @@ Agentengesprächskontext.
 - kanonische Projekt- und Pfad-Allowlist,
 - Betrieb ohne Root-/Administratorrechte,
 - literal Eingaben ohne Shell-Interpolation,
+- direkter Agentenprozess ohne Shell-Fallback,
+- kein gleichzeitiges lokales und mobiles Schreiben in dasselbe Pane,
+- Reattach nur mit übereinstimmenden tmux-IDs und Roundtable-Markern,
 - sichere Tokenablage,
 - Prompt- und Runtime-Prüfung vor Approval-Buttons,
 - keine geratenen Sessionziele,
@@ -335,6 +357,7 @@ Windows-Unterstützung.
 2. Agent und Modell gehören zur Session.
 3. Jede Session ist eine echte native CLI.
 4. Messenger und lokales Terminal bedienen denselben Agentenprozess.
+   Sie schreiben kontrolliert abwechselnd, nicht gleichzeitig.
 5. Replies gehen an die tmux-Session der beantworteten Nachricht.
 6. Freie Nachrichten gehen an die Default-Session.
 7. Die erste Session wird initialer Default; spätere ändern ihn nicht.
@@ -343,6 +366,7 @@ Windows-Unterstützung.
 10. Hooks sind nur optionale Sensoren.
 11. Bei unklarer Zuordnung wird nicht geraten.
 12. Telegram ist der erste, aber nicht der einzige geplante Transport.
+13. Unklare Teilzustellungen werden nicht automatisch wiederholt.
 
 ## Fragen an den Reviewer
 
@@ -350,14 +374,14 @@ Bitte analysiere kritisch:
 
 1. Ist ein zuverlässiger inhaltstreuer Tunnel über tmux für Claude Code und
    Codex praktisch umsetzbar?
-2. Wie sollten `pipe-pane`, `capture-pane`, Raw Cursor und Screen State
-   kombiniert werden?
+2. Welcher gemessene Collector-Mix aus `pipe-pane`, tmux Control Mode,
+   `capture-pane`, Raw Cursor und Screen State ist robust?
 3. Wie erkennt man stabile neue Agentenausgabe, ohne einen zweiten
    Agentenkanal einzuführen?
 4. Wie lassen sich Texte inklusive Sonderzeichen und Mehrzeiligkeit sicher
    literal in tmux einfügen?
-5. Welche Race Conditions entstehen bei gleichzeitiger lokaler und mobiler
-   Bedienung?
+5. Welche Tests und UX braucht die festgelegte Schreibsperre zwischen lokaler
+   und mobiler Bedienung?
 6. Wie sollte Output-Backpressure für einen einzigen Telegram-Chat aussehen?
 7. Welche Teile von ccgram wären sinnvoll wiederverwendbar, ohne dessen
    Topic-pro-Session-Modell zu übernehmen?

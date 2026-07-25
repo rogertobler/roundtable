@@ -415,6 +415,10 @@ Eine freie Textantwort auf den Freigabeprompt wird ebenfalls exakt an die
 zugehörige Session gesendet. Roundtable entscheidet nicht, ob der Text eine
 Zustimmung darstellt.
 
+Approval-Buttons gehören erst zur robusten Interaktionsphase. Der erste MVP
+sendet den originalen Prompt als routbare Nachricht und tunnelt die freie Reply
+1:1 zurück.
+
 ## Optionaler CLI-Snapshot
 
 ```text
@@ -498,6 +502,44 @@ Die Nachricht wurde nicht an eine andere Session gesendet.
 Technische Details werden auf Wunsch gezeigt, nicht ungefiltert in jede
 Inbox-Nachricht geschrieben.
 
+### Lokaler Client bedient die Session
+
+```text
+Backend Review · Codex
+Nachricht wartet.
+
+Die Session wird gerade lokal in tmux bedient. Roundtable schreibt nicht
+gleichzeitig in dasselbe Pane.
+
+[Erneut prüfen]
+[Mobile Steuerung übernehmen]
+[Nachricht abbrechen]
+[CLI-Snapshot]
+```
+
+„Mobile Steuerung übernehmen“ ist eine explizit bestätigte Aktion. Roundtable
+detached dabei die normalen Clients dieser Session kontrolliert, prüft Marker,
+Pane und Clients erneut und schreibt erst danach. Schlägt das Detach oder die
+Prüfung fehl, bleibt die Nachricht in der Queue.
+
+### Zustellung unklar
+
+```text
+Backend Review · Codex
+Zustellung unklar.
+
+Roundtable wurde während des Schreibens unterbrochen. Die Nachricht wird nicht
+automatisch erneut gesendet.
+
+[CLI-Snapshot]
+[Erneut senden]
+[Als erledigt markieren]
+```
+
+Die Ansicht zeigt zusätzlich den ursprünglichen Text, Zeitpunkt und
+Runtime-Generation. „Erneut senden“ ist eine neue, ausdrücklich bestätigte
+Zustellung mit eigener Auditspur.
+
 ## Schutz vor Fehlbedienung
 
 - Stoppen, Löschen, Worktree-Entfernung und riskante Neustarts benötigen eine
@@ -508,3 +550,5 @@ Inbox-Nachricht geschrieben.
 - Der Default-Wechsel ist explizit und wird protokolliert.
 - Eine Agentennachricht kann die Default-Session nicht selbst ändern.
 - Sensible Inhalte können vor dem Versand blockiert oder maskiert werden.
+- Ein lokaler Client und Roundtable schreiben standardmäßig nicht gleichzeitig.
+- Eine unklare Teilzustellung wird nie automatisch wiederholt.

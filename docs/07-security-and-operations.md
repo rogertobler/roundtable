@@ -283,7 +283,11 @@ oder bekannte Secretdateien ausgeben.
 - keine vollständigen Umgebungsvariablen,
 - keine unmaskierten Startbefehle mit Secrets,
 - Telegram-Updatepayloads nur bei explizitem Debugmodus und redigiert,
-- Raw Output erhält eigene restriktive Rechte und Retention,
+- Raw Output ist per Definition unverändert und wird nicht als garantiert
+  secretfrei bezeichnet,
+- Raw-Output-Dateien erhalten restriktive Rechte, eigene Retention und optional
+  Verschlüsselung oder vollständige Deaktivierung,
+- gerenderte Messenger- und Diagnoselogs werden getrennt best effort redigiert,
 - Fehlerberichte trennen Diagnosemetadaten von Inhalten.
 
 ## Netzwerk
@@ -307,6 +311,8 @@ Empfehlungen:
 - eigenes Datenverzeichnis mit Benutzerzugriff,
 - Session-Host-Sockets nur für den Besitzer,
 - keine Shell-Interpolation für Telegramtexte,
+- Agenten-CLI direkt als Pane-Prozess starten, ohne Shell-Fallback nach ihrem
+  Ende,
 - keine dynamischen ausführbaren Pfade außerhalb freigegebener Profile,
 - Arbeitsverzeichnis vor jedem Start kanonisch prüfen,
 - temporäre Dateien sicher und mit restriktiven Rechten anlegen.
@@ -445,10 +451,25 @@ verändern.
 tmux oder separate Session Hosts halten Agenten weiter. Nach Neustart werden
 Runtimes und Output-Cursor wiederverbunden.
 
+Hat der Core vor dem Absturz bereits mit einem Pane-Write begonnen, kann
+technisch nicht in jedem Fall bewiesen werden, ob Text oder Abschlusstaste
+angekommen sind. Solche Eingaben werden als `delivery_uncertain` markiert,
+nicht automatisch wiederholt und zusammen mit aktuellem CLI-Snapshot zur
+Benutzerentscheidung angeboten.
+
 ### Session Host stürzt ab
 
 Session wird als `disconnected` oder `error` markiert. Agent-Resume oder
 Runtime-Neustart wird angeboten.
+
+### Lokaler Client ist attached
+
+Ein normaler interaktiver tmux-Client und Roundtable dürfen standardmäßig
+nicht gleichzeitig in dasselbe Pane schreiben. Messenger-Eingaben bleiben in
+der Queue, bis der lokale Client detached ist oder der Benutzer die mobile
+Steuerung ausdrücklich übernimmt. Eine Übernahme detached die normalen Clients
+nach Bestätigung und prüft vor dem Write erneut. Diese Sperre verhindert
+interleavte Tastensequenzen; sie ist keine Dateisystem- oder Agentensandbox.
 
 ## Schutz vor unkontrollierter Aktivität
 

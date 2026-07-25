@@ -60,6 +60,10 @@ Codex und Claude Code sind die ersten Agenten.
    nicht an einen Roundtable-Cloud-Dienst übertragen werden.
 13. **Sicherheit ist standardmäßig restriktiv.** Nur freigegebene Benutzer,
     Projekte, Verzeichnisse und Aktionen werden zugelassen.
+14. **Ein Pane hat zur selben Zeit nur einen schreibenden Bedienpfad.**
+    Lokales Terminal und Messenger verwenden denselben Prozess, wechseln sich
+    beim Schreiben aber kontrolliert ab. Unklare Teilzustellungen werden nie
+    automatisch wiederholt.
 
 ## Beispiel
 

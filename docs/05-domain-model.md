@@ -153,7 +153,11 @@ RuntimeInstance
   sessionId
   backendType
   externalRuntimeId
+  externalPaneId
+  runtimeMarker
   hostProcessId
+  expectedExecutable
+  expectedWorkingDirectory
   generation
   status
   terminalColumns
@@ -169,9 +173,12 @@ RuntimeInstance
 Ein Neustart erzeugt eine neue Runtime-Generation unter derselben Session.
 Historische Runtimeinstanzen bleiben für Audit und Logzuordnung erhalten.
 
-In der ersten Implementierung ist `externalRuntimeId` die kontrollierte
-tmux-Session-ID. Genau eine aktive Runtimeinstanz ist das schreibbare Ziel für
-Messenger-Replies.
+In der ersten Implementierung ist `externalRuntimeId` die stabile
+tmux-Session-ID und `externalPaneId` die stabile Pane-ID. `runtimeMarker` ist
+eine von Roundtable erzeugte UUID, die zusätzlich als tmux User Option an
+Session und Pane gespeichert wird. PID, Startbefehl und Arbeitsverzeichnis sind
+sekundäre Evidenz und ersetzen diesen Marker nicht. Genau eine aktive
+Runtimeinstanz ist das schreibbare Ziel für Messenger-Replies.
 
 ### DefaultSession
 
@@ -333,13 +340,36 @@ SessionInput
   sequence
   status
   queuedAt
+  preflightPassedAt
+  writeStartedAt
   writtenAt
+  keySentAt
+  deliveredAt
+  uncertainAt
   failedAt
   error
 ```
 
 Der `sequence`-Wert ist innerhalb einer Session monoton. Die Queue verarbeitet
 immer die kleinste noch offene Sequenz.
+
+Zulässige Hauptzustände:
+
+- `queued`,
+- `preflight_passed`,
+- `write_started`,
+- `text_written`,
+- `key_sent`,
+- `delivered`,
+- `delivery_uncertain`,
+- `failed`,
+- `cancelled`.
+
+`delivered` bedeutet nur, dass der technische tmux-Schreibablauf ohne
+bekannten Fehler abgeschlossen wurde. Es beweist nicht, dass der Agent den Text
+semantisch verarbeitet hat. `delivery_uncertain` ist ein terminaler
+Sicherheitszustand für einen Absturz oder Verbindungsverlust nach Beginn des
+Schreibens; Roundtable wiederholt ihn nicht automatisch.
 
 ### Interaction
 
@@ -533,6 +563,12 @@ Interaktionszustand anschließend wieder `ready`.
     Default existiert; spätere Sessions ändern den Default nicht.
 16. Ein lokales Attach erzeugt keine zweite Session und keinen zweiten
     Agentenkontext.
+17. Solange ein normaler interaktiver Client attached ist, beginnt Roundtable
+    standardmäßig keinen neuen Pane-Schreibvorgang.
+18. Ein SessionInput im Zustand `delivery_uncertain` wird nur nach einer
+    ausdrücklichen Benutzeraktion erneut gesendet oder abgeschlossen.
+19. Eine Runtime wird nach Neustart nur dann automatisch wiederverbunden, wenn
+    gespeicherte tmux-IDs und Roundtable-Marker übereinstimmen.
 
 ## Persistenztransaktionen
 
@@ -545,6 +581,11 @@ Folgende Vorgänge müssen atomar sein:
 - kanonische Nachricht speichern,
 - SessionInput anlegen,
 - Outbox-Eintrag für Queue-Verarbeitung erzeugen.
+
+Das Erstellen des `SessionInput` ist idempotent. Das spätere Schreiben in ein
+PTY kann nach einem Prozessabbruch jedoch nicht in allen Fällen genau einmal
+bewiesen werden. Persistenz verhindert deshalb automatische Doppelzustellung,
+indem ein unklarer Schreibzustand sichtbar stehen bleibt.
 
 ### Ausgehende Nachricht
 
@@ -562,7 +603,10 @@ Deshalb:
 - Status atomar von `open` auf `resolving` setzen,
 - SessionInput mit Idempotenzschlüssel anlegen,
 - nach Runtime-Schreiben auf `resolved` setzen,
-- bei Fehler kontrolliert auf `open` oder `failed` zurücksetzen.
+- vor Schreibbeginn bei Fehler kontrolliert auf `open` oder `failed`
+  zurücksetzen,
+- nach unklarem Schreibbeginn Interaction und SessionInput als unklar markieren
+  und keine zweite Eingabe erzeugen.
 
 ### Default-Wechsel
 

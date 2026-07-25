@@ -93,6 +93,9 @@ LaunchCommand
 ```
 
 Roundtable baut keinen frei interpolierten Shellstring aus Messengerdaten.
+Die Agenten-CLI wird als direkter Pane-Prozess gestartet. Ein beendeter Agent
+darf nicht unbemerkt einen interaktiven Shell-Prompt als neues Eingabeziel
+hinterlassen.
 
 ## Capability-Modell
 
@@ -187,8 +190,10 @@ tmux erfüllt die zentralen Anforderungen:
 - mehrere parallele Sessions.
 
 Roundtable verwendet einen eigenen Namensraum und eine unveränderliche
-technische Runtime-ID. Der sichtbare Sessionname ist nicht die einzige
-Identität.
+technische Runtime-ID. Zusätzlich setzt es an tmux-Session und Ziel-Pane
+Roundtable User Options mit interner Session-UUID und Runtime-Generation. Der
+sichtbare Sessionname, der Prozessname oder eine PID allein sind keine
+ausreichende Identität.
 
 Beispiel:
 
@@ -207,10 +212,11 @@ Der Startablauf:
 1. Benutzer wählt Agent, Modell, Projekt und Sessionname.
 2. Roundtable prüft Allowlist, Arbeitsverzeichnis, tmux und CLI.
 3. Roundtable erzeugt eine technische Runtime-ID.
-4. Roundtable legt eine detached tmux-Session an.
-5. Roundtable konfiguriert eine ausreichend große History.
+4. Roundtable legt eine detached tmux-Session an und setzt Session-/Pane-Marker.
+5. Roundtable konfiguriert eine ausreichend große History und feste
+   Terminalmaße.
 6. Roundtable aktiviert den fortlaufenden Outputpfad.
-7. Roundtable startet die CLI im Projektverzeichnis.
+7. Roundtable startet die CLI direkt als Pane-Prozess im Projektverzeichnis.
 8. Roundtable prüft Prozess und Startbereitschaft.
 9. Roundtable speichert die Sessionzuordnung.
 10. Ist es die erste Session ohne vorhandenen Default, wird sie Default.
@@ -233,22 +239,30 @@ SendKeys([ArrowDown, ArrowDown, Enter])
 
 Für normale Messengernachrichten:
 
-1. Text als Daten in einen tmux-Buffer laden.
-2. Buffer in das Ziel-Pane einfügen.
-3. Enter separat senden.
+1. Runtime-Marker, Pane-Zustand und interaktive Attach-Clients prüfen.
+2. Text über Standard Input als Daten in einen tmux-Buffer laden.
+3. Buffer in das Ziel-Pane einfügen.
+4. Bracketed Paste nur mit `paste-buffer -p` nutzen, wenn tmux den
+   `bracket_paste_flag` für das Pane meldet.
+5. Enter separat senden.
 
 Dadurch werden Shell-Metazeichen nicht von Roundtable ausgewertet.
 
 Mehrzeilige Nachrichten benötigen eine definierte Paste-Strategie, die mit den
-unterstützten Agenten-CLIs getestet wird.
+unterstützten Agenten-CLIs und Versionen getestet wird. Roundtable darf
+Bracketed-Paste-Sequenzen nicht pauschal erzwingen und darf eine unbekannte
+Multiline-Eingabe nicht zeilenweise ausführen.
 
 ## Ausgaben
 
 ### Raw Stream
 
-`tmux pipe-pane` schreibt den fortlaufenden Terminaldatenstrom in einen
-kontrollierten lokalen Outputpfad. Roundtable verfolgt einen Byte- oder
-Sequenzcursor.
+`tmux pipe-pane` kann den fortlaufenden Terminaldatenstrom in einen
+kontrollierten lokalen Outputpfad schreiben. tmux Control Mode kann alternativ
+Pane- und Lebenszyklusereignisse liefern. Dessen `%output` bleibt derselbe rohe
+Terminaldatenstrom; Control Mode löst daher weder TUI-Rendering noch
+Nachrichtengrenzen. Der technische Spike misst beide Varianten, bevor der
+Collector festgelegt wird. Roundtable verfolgt einen Byte- oder Sequenzcursor.
 
 ### Screen State
 
@@ -283,6 +297,13 @@ Ein Terminaldatenstrom enthält:
 
 Roundtable darf diese technischen Artefakte normalisieren. Es darf jedoch keine
 Sätze umformulieren oder Inhalte durch ein LLM zusammenfassen.
+
+Ein Eingabe-Echo wird nur unterdrückt, wenn es technisch mit einer konkreten
+Roundtable-Zustellung korreliert werden kann. Ein bloßer Textvergleich ist
+unzureichend, weil der Agent denselben Text legitim ausgeben kann. Globales
+`stty -echo`, erzwungenes `TERM=dumb` oder `CI=true` sind keine
+Standardstrategie: Sie verändern das native CLI-Verhalten und dürfen nur als
+agentenseitig dokumentierte Kompatibilitätsoption getestet werden.
 
 Der Processor benötigt pro Session:
 
@@ -334,32 +355,49 @@ Roundtable entscheidet nicht, ob eine Aktion erlaubt werden soll.
 
 Der Benutzer darf dieselbe tmux-Session lokal attachen.
 
-Folgen:
+Lesen und Beobachten bleiben jederzeit möglich. Für Schreibzugriffe gilt:
 
 - lokale Eingaben erreichen unmittelbar den Agenten,
 - Telegram-Eingaben erreichen denselben Prozess,
-- Roundtable serialisiert nur seine eigenen Eingaben,
+- erkennt Roundtable einen normalen interaktiven tmux-Client, hält es neue
+  Telegram-Eingaben standardmäßig in der Queue,
+- der Benutzer kann lokal detachen oder im Messenger ausdrücklich die mobile
+  Steuerung übernehmen; Roundtable detached dann nach Bestätigung die normalen
+  Clients und prüft vor dem Write erneut,
+- Roundtable mischt niemals Zeichen lokaler und mobiler Eingaben,
 - lokale Eingaben können offene Telegram-Buttons veralten lassen,
 - der Screen State wird vor einer Buttonaktion erneut geprüft,
 - Antworten auf lokale Eingaben erscheinen ebenfalls im beobachteten Output.
 
 Eine Session darf niemals dupliziert werden, nur weil der Benutzer sie lokal
-öffnet.
+öffnet. Eine Heuristik über „letzte lokale Aktivität“ ist kein Ersatz für diese
+konservative Schreibsperre.
 
 ## Wiederverbindung
 
 Nach einem Roundtable-Neustart:
 
 1. gespeicherte Session- und Runtime-IDs laden,
-2. Existenz der tmux-Session prüfen,
-3. primären Prozess und Arbeitsverzeichnis validieren,
-4. Output Capture prüfen oder erneuern,
-5. ab gespeichertem Cursor weiterlesen,
-6. Status neu bestimmen.
+2. stabile tmux-Session- und Pane-IDs prüfen,
+3. Roundtable-UUID und Runtime-Generation aus User Options vergleichen,
+4. Pane-Zustand, primären Prozess und Arbeitsverzeichnis validieren,
+5. Output Capture prüfen oder erneuern,
+6. ab gespeichertem Cursor weiterlesen,
+7. nach begonnenem, aber nicht abgeschlossenem Write
+   `delivery_uncertain` setzen,
+8. Status neu bestimmen.
 
 tmux bleibt währenddessen aktiv.
 
 Eine gleichnamige fremde tmux-Session darf nicht automatisch adoptiert werden.
+
+## Terminalgröße
+
+Roundtable verwendet pro Runtime eine feste, gespeicherte virtuelle Größe,
+deren Ausgangswert im Spike festgelegt wird. tmux wird so konfiguriert, dass
+ein lokaler Attach die Maße nicht still verändert. Eine bewusste
+Größenänderung erzeugt eine neue Rendergeneration, weil harte Umbrüche und
+TUI-Layout davon abhängen.
 
 ## Bestehende Sessions übernehmen
 

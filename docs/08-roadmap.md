@@ -17,16 +17,28 @@ Umfang:
 - aktuellen ccgram-Code und dessen tmux-Strategie technisch bewerten,
 - eine tmux-Session starten,
 - Claude Code und Codex jeweils testweise starten,
-- Output über `pipe-pane` erfassen,
+- Agenten-CLI jeweils direkt als Pane-Prozess ohne Shell-Fallback starten,
+- Output über `pipe-pane` und tmux Control Mode vergleichend erfassen,
 - Terminalbild über `capture-pane` lesen,
-- literal Text und Grundtasten senden,
+- feste virtuelle Terminalgröße konfigurieren und Attach/Detach testen,
+- literal Text und Grundtasten über Buffer senden,
+- Singleline, Multiline, Unicode, Backticks und große Eingaben prüfen,
+- Bracketed Paste mit aktivierter und deaktivierter Anwendung testen,
+- Eingabe-Echo von legitimer Agentenausgabe unterscheiden,
 - Telegram-Nachrichten-ID einer Session zuordnen,
 - Reply an die richtige Session senden,
 - Claude und Codex gleichzeitig betreiben,
 - typische Approval-Prompts beider Agenten aufzeichnen,
 - Router neu starten und tmux-Session wiederfinden,
+- Reattach mit tmux User Options, stabilen IDs und absichtlicher
+  Namenskollision testen,
+- Core während jeder Stufe einer Eingabezustellung hart beenden,
 - Telegram-Eingabe nach lokalem `tmux attach` im nativen CLI-Verlauf sehen,
-- lokale CLI-Eingabe beobachten und ihre Agentenantwort in Telegram sehen.
+- lokale CLI-Eingabe beobachten und ihre Agentenantwort in Telegram sehen,
+- gleichzeitige lokale/mobile Eingabe provozieren und die Schreibsperre prüfen,
+- 30-minütige reale Claude-/Codex-Turns mit Spinnern, Toolausgaben,
+  Auswahlmenüs und Ruhephasen als Fixtures aufzeichnen,
+- fünf parallele Sessions gegen Telegram-Backpressure testen.
 
 Abnahme:
 
@@ -39,6 +51,15 @@ Abnahme:
 - Nach Router-Neustart bleiben tmux-Prozesse aktiv und Zuordnungen bestehen.
 - Raw Stream und Screen Snapshot sind praktisch unterscheidbar.
 - Lokal und über Telegram ist derselbe native CLI-Verlauf sichtbar.
+- `pipe-pane` und Control Mode sind anhand von Messdaten bewertet; die
+  Collector-Entscheidung behauptet keine semantischen Nachrichtengrenzen.
+- In 100 absichtlich konkurrierenden lokalen/mobilen Zustellungen werden keine
+  Zeichen interleavt.
+- Nach 20 Core-Abbrüchen während verschiedener Write-Stufen entsteht weder
+  automatische Doppelzustellung noch stiller Verlust; unklare Fälle werden
+  sichtbar als `delivery_uncertain` markiert.
+- Eine beendete Agenten-CLI lässt keine Messenger-Eingabe an eine Shell fallen.
+- Reattach lehnt eine gleichnamige oder manipulierte tmux-Session sicher ab.
 
 Ergebnis:
 
@@ -46,6 +67,8 @@ Ergebnis:
 - validierte tmux-Kommandos,
 - Entscheidung über Implementierungssprache,
 - konkretisierte Transport-, CLI-Definitions- und Tunnelverträge,
+- Entscheidung über Outputquelle, Terminalemulator und feste Standardgröße,
+- dokumentierte, agenten- und versionsbezogene Eingabematrix,
 - dokumentierte Entscheidung „übernehmen, wiederverwenden oder neu bauen“ für
   relevante ccgram-Komponenten.
 
@@ -65,6 +88,9 @@ Umfang:
 - Codex-CLI-Definition,
 - Agent und Modell pro Session,
 - tmux-Runtime,
+- direkte Agentenprozesse ohne Shell-Fallback,
+- Roundtable-UUIDs als tmux User Options und geprüfter Reattach,
+- feste virtuelle Terminalgröße,
 - mehrere parallele Sessions,
 - geführter Session-Start,
 - Session-Liste und Detailansicht,
@@ -75,6 +101,9 @@ Umfang:
 - Outputaufbereitung ohne inhaltliches Umschreiben,
 - optionaler CLI-Snapshot,
 - Text, Enter, Escape und `Ctrl+C`,
+- persistente Session-Input-Queue mit Zustellungszustandsautomat,
+- sichtbarer Zustand `delivery_uncertain` ohne automatischen Retry,
+- Schreibsperre bei einem attachten interaktiven tmux-Client,
 - Session starten, unterbrechen und stoppen,
 - Abonnieren und Stummschalten,
 - einfache Statusmeldungen,
@@ -92,7 +121,9 @@ Abnahme:
 - Ohne Reply wird ausschließlich die konfigurierte Default-Session verwendet.
 - Telegram-Eingaben sind im lokal attachten CLI-Verlauf sichtbar.
 - Lokale Eingaben und Telegram-Eingaben nutzen denselben Agentenkontext.
+- Lokale und mobile Eingaben können nicht zeichenweise interleaven.
 - Doppelte Telegram-Updates erzeugen keine doppelten Terminaleingaben.
+- Ein Absturz während der Zustellung führt nie zu einem blinden Retry.
 - Neustart des Core beendet tmux-Sessions nicht.
 - Nicht autorisierte Telegram-Nutzer sehen keine Metadaten.
 - Projekte außerhalb der Allowlist können nicht gestartet werden.
@@ -106,7 +137,7 @@ Netzverbindungen.
 Umfang:
 
 - Transactional Outbox,
-- persistente Session-Input-Queues,
+- erweiterte Queue-Recovery- und Dead-Letter-Werkzeuge,
 - Output-Cursor und Backlog-Recovery,
 - per-Chat Rate Limiting und Backpressure,
 - stabile Fortschrittsnachrichten,

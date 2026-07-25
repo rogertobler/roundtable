@@ -193,8 +193,9 @@ Der Session Manager:
 - validiert Projekt, Pfad, Agent und Modell,
 - prüft tmux und die lokale Agenten-CLI,
 - baut den Startbefehl strukturiert,
-- legt die tmux-Session an,
-- startet die CLI im Arbeitsverzeichnis,
+- legt die tmux-Session mit Roundtable-eigenen User Options und festen
+  Terminalmaßen an,
+- startet die CLI als direkten Pane-Prozess im Arbeitsverzeichnis,
 - aktiviert Output Capture,
 - wartet auf erkennbare Startbereitschaft,
 - sendet optional die erste Aufgabe,
@@ -250,6 +251,7 @@ SessionBackend
   captureScreen(sessionId) -> ScreenSnapshot
   streamOutput(sessionId, cursor) -> OutputChunk[]
   inspect(sessionId) -> BackendStatus
+  interactiveClients(sessionId) -> ClientInfo[]
   interrupt(sessionId)
   resize(sessionId, columns, rows)
   stop(sessionId, stopMode)
@@ -265,11 +267,13 @@ Der Tunnel Dispatcher ist der einzige schreibende Roundtable-Pfad zur CLI.
 Er:
 
 - nimmt einen bereits autorisierten SessionInput entgegen,
-- prüft die aktuelle Runtime-Generation,
+- prüft Runtime-Generation, tmux-Identität, Pane-Zustand und Vordergrundprozess,
+- blockiert standardmäßig bei einem attachten interaktiven Benutzerclient,
 - serialisiert Eingaben pro Session,
 - schreibt Text literal,
 - sendet die gewünschte Abschlusstaste,
-- protokolliert den technischen Zustellstatus,
+- persistiert jeden technischen Zustellschritt,
+- wiederholt nach einem unklaren Teilzustand niemals automatisch,
 - führt niemals Shell-Interpolation mit Messengertext aus.
 
 ### Output Collector
@@ -278,9 +282,12 @@ Der Output Collector besitzt zwei Datenquellen:
 
 #### Fortlaufender Stream
 
-`tmux pipe-pane` oder ein äquivalenter Backendstrom liefert alle
-Terminalbytes in Reihenfolge. Er ist Grundlage für Raw Log, Output-Cursor und
-verlustarme Wiederaufnahme.
+`tmux pipe-pane`, tmux Control Mode oder ein äquivalenter Backendstrom liefert
+Pane-Bytes und technische Ereignisse. Der Spike vergleicht beide tmux-Wege.
+Control Mode kann Session- und Pane-Ereignisse explizit melden; auch sein
+`%output` ist jedoch roher Terminaloutput und enthält keine verlässlichen
+Agentenantwortgrenzen. Der gewählte fortlaufende Pfad ist Grundlage für Raw
+Log, Output-Cursor und verlustarme Wiederaufnahme.
 
 #### Bildschirm-Snapshot
 
@@ -304,12 +311,15 @@ Der Processor erzeugt aus dem Raw Stream stabile Messengerblöcke:
 3. Spinner und überschreibende Zeilen stabilisieren,
 4. neue stabile CLI-Ausgabe gegenüber dem letzten Cursor bestimmen,
 5. bekannte Turn- oder Prompt-Hinweise berücksichtigen,
-6. Secrets nach Best-Effort-Regeln maskieren,
-7. transportgerecht teilen und rendern,
-8. Abonnement anwenden.
+6. nachweislich korrelierte Eingabe-Echos technisch unterdrücken,
+7. Secrets für den Transport nach Best-Effort-Regeln maskieren,
+8. transportgerecht teilen und rendern,
+9. Abonnement anwenden.
 
 Roundtable verwendet dafür kein Sprachmodell. Es fasst Inhalte nicht
-eigenmächtig zusammen.
+eigenmächtig zusammen. Ein exakter Textvergleich allein ist kein sicherer
+Echo-Filter, weil der Agent denselben Text legitim wiederholen kann. Der Raw
+Stream bleibt lokal unverändert.
 
 ### Input Queue
 
@@ -327,9 +337,31 @@ SessionInput
   status
 ```
 
+Der Zustandsautomat unterscheidet mindestens:
+
+```text
+queued
+  -> preflight_passed
+  -> write_started
+  -> text_written
+  -> key_sent
+  -> delivered
+```
+
+Jeder Zustand kann vor Beginn des Schreibens in `failed` oder `cancelled`
+enden. Ein Prozessabbruch nach `write_started`, dessen Wirkung nicht
+zweifelsfrei feststeht, führt zu `delivery_uncertain`. Dieser Zustand wird nie
+automatisch wiederholt.
+
 Lokale Tastatureingaben in einer attachten tmux-Session laufen außerhalb
-dieser Queue. Deshalb werden stale Approvals vor einer Button-Aktion erneut
-gegen den aktuellen Bildschirm geprüft.
+dieser Queue. Roundtable verhindert deshalb standardmäßig mobile Writes,
+solange ein normaler interaktiver tmux-Client attached ist. Stale Approvals
+werden zusätzlich vor einer späteren Button-Aktion erneut gegen den aktuellen
+Bildschirm geprüft.
+
+Eine explizite mobile Übernahme detached nach Bestätigung die normalen Clients
+der Session. Der Dispatcher wiederholt danach den vollständigen Preflight;
+bleibt ein interaktiver Client attached, beginnt der Write nicht.
 
 ### Interaction Manager
 
@@ -365,13 +397,26 @@ Messengertext darf nicht Teil eines evaluierten Shellstrings werden.
 
 Vorgesehener Ablauf:
 
-1. Text als Daten in einen tmux-Buffer laden.
-2. Buffer literal in das Ziel-Pane einfügen.
-3. Optional Enter als separate Taste senden.
-4. Zustellung und Runtime-ID protokollieren.
+1. Runtime-Generation und Roundtable-UUID aus tmux User Options prüfen.
+2. Sicherstellen, dass Pane und erwarteter Agentenprozess noch leben.
+3. Prüfen, dass kein normaler interaktiver tmux-Client die Session bedient.
+4. Text über Standard Input als Daten in einen tmux-Buffer laden.
+5. Buffer literal in das Ziel-Pane einfügen.
+6. Bracketed Paste nur mit `paste-buffer -p` aktivieren, wenn tmux über
+   `bracket_paste_flag` meldet, dass die Anwendung den Modus angefordert hat.
+7. Optional Enter als separate Taste senden.
+8. Jeden Zustellschritt mit Runtime-ID protokollieren.
 
 Mehrzeilige Texte, Backticks, Dollarzeichen und Shell-Metazeichen bleiben
-Inhalt und werden nicht durch Roundtable interpretiert.
+Inhalt und werden nicht durch Roundtable interpretiert. Die Behandlung von
+Zeilenumbrüchen wird pro Agentenversion getestet; tmux ersetzt Zeilenumbrüche
+beim Paste abhängig von den verwendeten Optionen. Eine unbekannte
+Multiline-Konstellation wird nicht automatisch ausgeführt.
+
+Die Agenten-CLI läuft als direkter Pane-Prozess. Endet sie, bleibt das Pane
+höchstens zu Diagnosezwecken als beendet sichtbar; es fällt nicht auf eine
+interaktive Shell zurück. Damit kann eine verspätete Messenger-Nachricht nicht
+versehentlich an einen Shell-Prompt gelangen.
 
 ## Datenfluss: Sessionstart
 
@@ -514,13 +559,23 @@ Nach einem Core-Neustart:
 
 1. SQLite und unvollständige Outboxeinträge öffnen.
 2. als laufend gespeicherte Sessions laden.
-3. tmux nach den gespeicherten Runtime-IDs fragen.
-4. Arbeitsverzeichnis und primären Prozess validieren.
-5. Output Capture und Cursor wiederverbinden.
-6. Backlog seit dem letzten bestätigten Cursor verarbeiten.
-7. fehlende Sessions als `disconnected` markieren.
-8. niemals allein aufgrund eines ähnlichen Namens eine fremde Session
+3. tmux nach den gespeicherten stabilen Session- und Pane-IDs fragen.
+4. Roundtable-UUID und Runtime-Generation aus tmux User Options prüfen.
+5. Pane-Lebenszustand, Arbeitsverzeichnis, Startbefehl und Prozessbaum als
+   zusätzliche Evidenz validieren.
+6. Output Capture und Cursor wiederverbinden.
+7. Backlog seit dem letzten bestätigten Cursor verarbeiten.
+8. offene Eingaben vor `write_started` normal fortsetzen.
+9. Eingaben ab `write_started` ohne eindeutige technische Evidenz als
+   `delivery_uncertain` markieren und nicht automatisch wiederholen.
+10. fehlende oder widersprüchliche Sessions als `disconnected` markieren.
+11. niemals allein aufgrund eines ähnlichen Namens eine fremde Session
    übernehmen.
+
+`capture-pane` kann bei der Diagnose einer unklaren Eingabe helfen, beweist
+aber weder genau einmal erfolgte Zustellung noch semantische Verarbeitung durch
+den Agenten. Der Benutzer erhält Snapshot, ursprüngliche Eingabe und die
+Aktionen „erneut senden“ oder „als erledigt markieren“.
 
 ## Plattformen
 
@@ -578,5 +633,8 @@ Unix-PTY-Bibliotheken reichen dafür nicht.
 - Output-Backpressure blockiert nicht die CLI.
 - Persistenzfehler blockieren neue riskante Zustellungen.
 - Agenten-CLIs bleiben unabhängig aktualisierbar.
+- Ein normaler lokaler tmux-Client und Roundtable schreiben standardmäßig nicht
+  gleichzeitig in dasselbe Pane.
+- Terminalmaße sind pro Runtime deterministisch und versioniert.
 - Die Funktion „lokal attachen und denselben Verlauf sehen“ ist ein
   verpflichtender End-to-End-Test.

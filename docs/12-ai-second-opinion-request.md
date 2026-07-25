@@ -127,6 +127,9 @@ Roundtable führt keinen parallelen API-, SDK- oder App-Server-Chat.
 Alle Messenger-Eingaben werden in diese CLI geschrieben. Alle
 Agentenantworten stammen aus der Ausgabe dieser CLI.
 
+Die CLI läuft direkt als Pane-Prozess. Endet sie, darf das Pane nicht
+unbemerkt auf einen interaktiven Shell-Prompt zurückfallen.
+
 ### 4. Lokales Terminal und Messenger sehen denselben Kontext
 
 Der Benutzer kann sich lokal an die von Roundtable verwaltete tmux-Session
@@ -142,6 +145,13 @@ sehen, einschließlich der über Telegram gesendeten Eingaben.
 Er kann anschließend lokal weiterschreiben. Die daraus entstehenden
 Agentenantworten sollen wiederum vom Roundtable-Tunnel erkannt und entsprechend
 dem Abonnement in den Messenger geleitet werden.
+
+Lokales und mobiles Schreiben erfolgt kontrolliert abwechselnd. Solange ein
+normaler interaktiver tmux-Client attached ist, hält Roundtable neue
+Messenger-Eingaben standardmäßig zurück. Der Benutzer detached lokal oder
+übernimmt die mobile Steuerung ausdrücklich. Eine Übernahme detached nach
+Bestätigung die normalen Clients und prüft vor dem Write erneut. Zeichen beider
+Quellen dürfen nicht interleaven.
 
 ### 5. Reply-Routing hat immer Vorrang
 
@@ -274,6 +284,21 @@ Sie dürfen nicht:
 - eine Freigabe automatisch entscheiden.
 
 Der grundlegende Tunnel muss auch ohne Hooks funktionieren.
+
+### 10. Terminal-I/O ist konservativ
+
+Jede Runtime erhält feste Terminalmaße sowie Roundtable-eigene Marker als tmux
+User Options. Vor einem Write werden Marker, Runtime-Generation, Pane-Zustand,
+Vordergrundprozess und lokale Clients geprüft.
+
+Pane-Writes besitzen persistierte Zwischenzustände. Ist nach einem Absturz
+unklar, ob Text oder Abschlusstaste angekommen sind, lautet der Zustand
+`delivery_uncertain`. Roundtable wiederholt eine solche Eingabe niemals
+automatisch.
+
+Bracketed Paste wird nur verwendet, wenn die Anwendung den Modus aktiviert
+hat. Roundtable erzwingt weder `TERM=dumb` noch `CI=true` noch globales
+`stty -echo`, weil dies die native interaktive CLI verändern kann.
 
 ## Beispielablauf
 
@@ -423,6 +448,7 @@ Verantwortlich für:
 - Agent- und Modellauswahl,
 - CLI-Start,
 - tmux-Lifecycle,
+- tmux User Options, stabile Session-/Pane-IDs und feste Terminalmaße,
 - Reattach nach Core-Neustart,
 - Sessionstatus,
 - Stoppen, Fortsetzen und Archivieren.
@@ -448,6 +474,7 @@ Sie ist kein alternativer Nachrichtenkanal.
 Der erste Backendvertrag wird durch tmux erfüllt:
 
 - dauerhafte interaktive CLI starten,
+- Agenten-CLI direkt ohne Shell-Fallback als Pane-Prozess halten,
 - literalen Text schreiben,
 - Tasten senden,
 - fortlaufende rohe Ausgabe liefern,
@@ -463,10 +490,15 @@ erhalten.
 
 Vorgesehene Quellen:
 
-- `tmux pipe-pane` für einen fortlaufenden Raw Stream,
+- `tmux pipe-pane` und tmux Control Mode als im Spike zu vergleichende
+  fortlaufende Quellen,
 - `tmux capture-pane` für den aktuellen Screen State,
 - append-only Output-Datei mit persistiertem Cursor,
 - optional Agenten-Hooks als reine Hinweise.
+
+Control Mode liefert strukturierte tmux-Ereignisse. Sein `%output` bleibt aber
+roher Pane-Output und definiert weder Agentenantwortgrenzen noch semantischen
+Status.
 
 Offen ist insbesondere, wie daraus zuverlässig stabile neue
 Agentennachrichten entstehen, ohne:
@@ -502,12 +534,14 @@ Gesprächskontext des Agenten.
 Messengertext darf niemals durch Shell-Interpolation in tmux geschrieben
 werden.
 
-Eine mögliche Strategie:
+Verbindlicher Rahmen:
 
-1. Text als Daten in einen tmux-Buffer laden.
-2. Buffer literal in das Ziel-Pane einfügen.
-3. Abschlusstaste separat senden.
-4. Zustellung idempotent protokollieren.
+1. Runtime-Marker, Pane-Zustand, Vordergrundprozess und lokale Clients prüfen.
+2. Text über Standard Input als Daten in einen tmux-Buffer laden.
+3. Buffer literal in das Ziel-Pane einfügen.
+4. Bracketed Paste nur bei aktivierter Zielanwendung verwenden.
+5. Abschlusstaste separat senden.
+6. jeden Zwischenzustand persistent protokollieren.
 
 Zu klären sind unter anderem:
 
@@ -519,11 +553,16 @@ Zu klären sind unter anderem:
 - Telegram-Dateien,
 - bracketed paste,
 - CLIs mit eigenem Multiline-Modus,
-- gleichzeitige lokale Eingabe,
+- Verhalten bei lokal attached Client und expliziter mobiler Übernahme,
 - Prozesswechsel im tmux-Pane.
 
 Ein Telegram-Retry oder doppelter Callback darf dieselbe Eingabe nicht zweimal
 in die CLI schreiben.
+
+Nach Beginn eines Pane-Writes ist echte Exactly-once-Semantik technisch nicht
+immer beweisbar. Ein Crash führt deshalb bei fehlender eindeutiger Evidenz zu
+`delivery_uncertain`, CLI-Snapshot und Benutzerentscheidung, nicht zu einem
+automatischen Retry.
 
 ## Ausgabe und Backpressure
 
@@ -557,15 +596,18 @@ Nach Neustart soll Roundtable:
 
 1. SQLite öffnen,
 2. registrierte tmux-Sessions erkennen,
-3. Runtime-Identität prüfen,
+3. stabile tmux-IDs sowie Roundtable-UUID und Runtime-Generation aus User
+   Options prüfen,
 4. Output-Cursor wiederherstellen,
 5. Output Capture erneut verbinden,
-6. ausstehende Zustellungen sicher fortsetzen,
-7. tote oder fremde Sessions als Fehler markieren.
+6. nur Zustellungen vor Schreibbeginn automatisch fortsetzen,
+7. unklare Zustellungen ab Schreibbeginn als `delivery_uncertain` markieren,
+8. tote oder fremde Sessions als Fehler markieren.
 
 Eine tmux-Session darf nicht allein anhand eines frei wählbaren Namens
-übernommen werden. Es braucht eine belastbare Zuordnung, beispielsweise über
-interne IDs, tmux-Metadaten, kontrollierte Logpfade und Prozessdaten.
+übernommen werden. Automatisches Reattach verlangt stabile tmux-Session- und
+Pane-IDs sowie übereinstimmende Roundtable-Marker. Arbeitsverzeichnis,
+Startbefehl und Prozessbaum sind zusätzliche Evidenz.
 
 ## Sicherheit
 
@@ -582,6 +624,9 @@ Mindestens vorgesehen:
 - Betrieb ohne Root- oder Administratorrechte,
 - sichere Speicherung des Bot-Tokens,
 - keine Shell-Auswertung von Messengertext,
+- Agentenprozess direkt ohne Shell-Fallback,
+- kein gleichzeitiges lokales und mobiles Schreiben,
+- keine automatische Wiederholung unklarer Pane-Writes,
 - keine automatische Approval-Entscheidung,
 - idempotente Nachrichten und Buttons,
 - Ablauf und Zustandsprüfung interaktiver Buttons,
@@ -648,6 +693,7 @@ Der erste nutzbare Linux-MVP soll enthalten:
 - Agent und Modell pro Session,
 - Session über Telegram erstellen,
 - tmux-Session und CLI starten,
+- direkte Pane-Prozesse, Runtime-Marker und feste Terminalmaße,
 - mehrere Sessions parallel,
 - gemeinsame Inbox,
 - persistentes Reply-Routing,
@@ -655,6 +701,8 @@ Der erste nutzbare Linux-MVP soll enthalten:
 - manueller Default-Wechsel,
 - freie Nachrichten an den Default,
 - inhaltstreue Texteingabe,
+- persistenter Eingabe-Zustandsautomat mit `delivery_uncertain`,
+- lokale/mobile Schreibsperre,
 - fortlaufende Output-Erfassung,
 - einfache Status- und Fehlererkennung,
 - Approval-Prompts inhaltstreu weiterleiten,
@@ -725,6 +773,28 @@ Codex. Nach aktuellem Stand nutzt es einen aktiven Provider und einen Chat pro
 laufendem CLI-Prozess. Roundtable unterscheidet sich durch mehrere gleichzeitig
 sichtbare Sessions im selben Chat und das persistente Reply-/Default-Routing.
 
+### Codex Telegram Bridge
+
+Primärquelle:
+
+- <https://github.com/ssamssae/codex-telegram-bridge>
+
+Das Projekt steuert eine sichtbare Codex-TUI über tmux und verwendet Codex-JSONL
+als zusätzlichen Ereignissensor. Damit validiert es den nativen Tunnelansatz,
+ist aber bewusst Codex-spezifisch und bietet keine gemeinsame Multi-Agent-Inbox
+mit Reply-Routing zwischen vielen Sessions.
+
+### cc-telegram-bridge
+
+Primärquelle:
+
+- <https://github.com/cloveric/cc-telegram-bridge>
+
+Das Projekt unterstützt Claude und Codex sowie Agent-Bus-Workflows, verwendet
+aber getrennte Bot-/Agenteninstanzen beziehungsweise andere CLI-Harnesses.
+Roundtables Produktgrenze bleibt der gemeinsame Chat mit Reply-/Default-Routing
+zu vielen echten interaktiven Sessions.
+
 ### Offizielle Claude-Funktionen
 
 Primärquellen:
@@ -761,8 +831,9 @@ Bitte beantworte mindestens die folgenden Fragen.
    zuverlässig denselben sichtbaren CLI-Verlauf teilen?
 7. Welche Probleme entstehen durch Alternate Screen, Vollbild-TUIs,
    Cursorbewegungen, Resize, Scrollback und Eingabe-Echo?
-8. Wie sollten `pipe-pane`, `capture-pane` und persistente Raw-Logs kombiniert
-   werden?
+8. Welcher gemessene Mix aus `pipe-pane`, tmux Control Mode, `capture-pane` und
+   persistenten Raw-Logs ist robust, obwohl `%output` keine
+   Agentenantwortgrenzen liefert?
 9. Wie erkennt Roundtable neue stabile Agentenausgabe ohne fragile
    Wortlautparser?
 10. Wie kann lokaler Benutzerinput von Agentenoutput und Messenger-Echo
@@ -779,8 +850,9 @@ Bitte beantworte mindestens die folgenden Fragen.
 14. Wann darf eine Messenger-Nachricht als erfolgreich zugestellt gelten?
 15. Wie verhindert man doppelte Eingaben nach Crash, Retry oder Telegram
     Redelivery?
-16. Wie sollte gleichzeitige lokale und mobile Eingabe serialisiert oder
-    zumindest sichtbar gemacht werden?
+16. Welche Tests und UX sind für die festgelegte Sperre nötig, nach der
+    Roundtable bei einem normal attached lokalen Client mobile Writes
+    zurückhält?
 
 ### Approvals
 
@@ -790,8 +862,8 @@ Bitte beantworte mindestens die folgenden Fragen.
     senden darf?
 19. Wie sollte Prompt-Ablauf beziehungsweise Stale-State-Prüfung implementiert
     werden?
-20. Sollte der erste MVP Approval-Buttons anbieten oder zunächst ausschließlich
-    freie Replies 1:1 tunneln?
+20. Welche technischen Abnahmekriterien müssen erfüllt sein, bevor die für
+    Phase 2 vorgesehenen Approval-Buttons aktiviert werden dürfen?
 
 ### Sicherheit
 
