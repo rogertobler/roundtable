@@ -10,6 +10,10 @@ Die gemeinsame Inbox enthält Nachrichten aller Sessions, die der Benutzer
 abonniert hat. Eine Session muss keinen eigenen Chat und kein eigenes Topic
 besitzen. Die Zuordnung geschieht über gespeicherte Nachrichten-IDs.
 
+Der Telegram-Chat ist die primäre Roundtable-Oberfläche. Er zeigt eine
+gemeinsame, zeitlich sortierte Inbox mehrerer echter CLI-Sessions. Roundtable
+führt keinen zusätzlichen Agenten-Chat außerhalb dieser Sessions.
+
 Telegram Topics können später optional als alternative Darstellung unterstützt
 werden, sind aber nicht die Grundlage des Routings.
 
@@ -176,12 +180,26 @@ Die Session wurde gestartet.
 
 [Nachricht senden]
 [Als Default setzen]
-[Terminal]
+[CLI-Snapshot]
 [Details]
 ```
 
 Diese Nachricht ist bereits routbar. Eine Reply darauf erreicht die neue
 Session.
+
+Im Hintergrund wurde eine tmux-Session erstellt und darin die gewählte
+Agenten-CLI gestartet. Alle folgenden Telegram-Eingaben erscheinen auch in
+dieser nativen CLI.
+
+Ist dies die erste erfolgreich erstellte Session und existiert noch kein
+Default, zeigt die Bestätigung zusätzlich:
+
+```text
+Diese Session ist jetzt deine Default-Session.
+Freie Nachrichten ohne Reply werden an sie gesendet.
+```
+
+Weitere Sessionstarts verändern den Default nicht.
 
 ## Session-Liste
 
@@ -351,7 +369,9 @@ Default-Session: Backend Review · Codex
 
 Es gibt bewusst keine automatisch wechselnde „aktive Session“. Ein
 Statuswechsel oder eine neue Agentennachricht darf die Default-Session nicht
-verändern.
+verändern. Ausschließlich die erste Session wird initial automatisch zum
+Default, wenn vorher kein Default existiert. Danach wird er nur manuell
+gewechselt.
 
 ## Freigaben
 
@@ -367,7 +387,7 @@ npm test
 
 [Einmal erlauben]
 [Ablehnen]
-[Terminal anzeigen]
+[CLI-Snapshot]
 ```
 
 Jede Schaltfläche ist intern an eine konkrete Eingabe gebunden, beispielsweise:
@@ -377,8 +397,8 @@ Einmal erlauben -> Taste "1", danach Enter
 Ablehnen        -> Taste "3", danach Enter
 ```
 
-Die Zuordnung stammt aus dem Agent-Adapter oder aus der aktuell erkannten
-Terminalinteraktion. Roundtable zeigt auf Wunsch die tatsächliche Tastenfolge.
+Die Zuordnung stammt aus der Agenten-Definition oder aus der aktuell erkannten
+CLI-Interaktion. Roundtable zeigt auf Wunsch die tatsächliche Tastenfolge.
 
 Kann der erwartete Prompt nicht mehr bestätigt werden, wird keine Taste
 gesendet:
@@ -386,7 +406,7 @@ gesendet:
 ```text
 Diese Freigabe ist nicht mehr aktuell.
 
-[Aktuelles Terminal anzeigen]
+[Aktuellen CLI-Snapshot anzeigen]
 [Session öffnen]
 ```
 
@@ -394,10 +414,10 @@ Eine freie Textantwort auf den Freigabeprompt wird ebenfalls exakt an die
 zugehörige Session gesendet. Roundtable entscheidet nicht, ob der Text eine
 Zustimmung darstellt.
 
-## Terminalansicht
+## Optionaler CLI-Snapshot
 
 ```text
-Terminal · Backend Review
+CLI-Snapshot · Backend Review
 
 ┌──────────────────────────────────────────────┐
 │ Running test suite...                        │
@@ -413,8 +433,10 @@ Terminal · Backend Review
 [Weitere Tasten]
 ```
 
-Die Ansicht ist ein Snapshot. Sie suggeriert keinen kontinuierlichen
-Live-Stream.
+Die Ansicht ist ein Snapshot derselben CLI-Session, die Roundtable tunnelt. Sie
+ist eine Diagnosefunktion und suggeriert keinen kontinuierlichen Live-Stream.
+Der normale Arbeitsfluss bleibt die gemeinsame Inbox. Für die vollständige
+native Bedienung kann der Benutzer die Session lokal mit tmux öffnen.
 
 ## Fortschrittsausgaben
 
@@ -468,7 +490,7 @@ Die Nachricht wurde nicht an eine andere Session gesendet.
 
 [Erneut versuchen]
 [Status prüfen]
-[Terminal anzeigen]
+[CLI-Snapshot]
 [Details]
 ```
 

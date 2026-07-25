@@ -4,8 +4,8 @@
 
 Roundtable soll den beschriebenen Gesamtumfang erreichen. Die Phasen reduzieren
 nicht die Vision, sondern schaffen überprüfbare Zwischenschritte. Jede Phase
-muss auf den stabilen Verträgen für Transport, Session, Agent und Runtime
-aufbauen.
+muss auf den stabilen Verträgen für Transport, Reply-Routing, Session-Tunnel
+und dünne Agenten-CLI-Definitionen aufbauen.
 
 ## Phase 0: Technischer Spike
 
@@ -14,6 +14,7 @@ Ziel: Die risikoreichsten Terminal- und Routingannahmen praktisch bestätigen.
 Umfang:
 
 - minimale Telegram-Bot-Verbindung,
+- aktuellen ccgram-Code und dessen tmux-Strategie technisch bewerten,
 - eine tmux-Session starten,
 - Claude Code und Codex jeweils testweise starten,
 - Output über `pipe-pane` erfassen,
@@ -24,22 +25,29 @@ Umfang:
 - Claude und Codex gleichzeitig betreiben,
 - typische Approval-Prompts beider Agenten aufzeichnen,
 - Router neu starten und tmux-Session wiederfinden.
+- Telegram-Eingabe nach lokalem `tmux attach` im nativen CLI-Verlauf sehen,
+- lokale CLI-Eingabe beobachten und ihre Agentenantwort in Telegram sehen.
 
 Abnahme:
 
 - Eine Claude- und eine Codex-Session laufen gleichzeitig.
+- Die erste erstellte Session wird automatisch Default.
+- Die zweite Session verändert diesen Default nicht.
 - Replies auf Nachrichten beider Sessions landen zehnmal hintereinander
-  nachweislich in der richtigen Session.
+  nachweislich in der richtigen tmux-Session.
 - Freie Nachricht geht an die gespeicherte Default-Session.
 - Nach Router-Neustart bleiben tmux-Prozesse aktiv und Zuordnungen bestehen.
 - Raw Stream und Screen Snapshot sind praktisch unterscheidbar.
+- Lokal und über Telegram ist derselbe native CLI-Verlauf sichtbar.
 
 Ergebnis:
 
 - Terminaltranskripte als Testfixtures,
 - validierte tmux-Kommandos,
 - Entscheidung über Implementierungssprache,
-- konkretisierte Adapterverträge.
+- konkretisierte Transport-, CLI-Definitions- und Tunnelverträge,
+- dokumentierte Entscheidung „übernehmen, wiederverwenden oder neu bauen“ für
+  relevante ccgram-Komponenten.
 
 ## Phase 1: Nutzbarer Linux-MVP
 
@@ -53,18 +61,19 @@ Umfang:
 - sicheres Einbenutzer-Pairing,
 - SQLite-Migrationen,
 - Projekt-Allowlist,
-- Claude-Code-Adapter,
-- Codex-Adapter,
+- Claude-Code-CLI-Definition,
+- Codex-CLI-Definition,
 - Agent und Modell pro Session,
 - tmux-Runtime,
 - mehrere parallele Sessions,
 - geführter Session-Start,
 - Session-Liste und Detailansicht,
 - Reply-Routing,
-- Default-Session,
+- erste Session als initialer Default,
+- manuell änderbare Default-Session,
 - explizite Sessionauswahl ohne Default,
 - Outputaufbereitung ohne inhaltliches Umschreiben,
-- Terminal-Snapshot,
+- optionaler CLI-Snapshot,
 - Text, Enter, Escape und `Ctrl+C`,
 - Session starten, unterbrechen und stoppen,
 - Abonnieren und Stummschalten,
@@ -77,8 +86,11 @@ Abnahme:
 
 - Mindestens fünf parallele Sessions funktionieren über mehrere Projekte.
 - Claude und Codex können gleichzeitig bedient werden.
+- Jede Session ist eine echte attachbare tmux-Session mit nativer CLI.
 - Jede Reply wird über persistiertes Mapping geroutet.
 - Ohne Reply wird ausschließlich die konfigurierte Default-Session verwendet.
+- Telegram-Eingaben sind im lokal attachten CLI-Verlauf sichtbar.
+- Lokale Eingaben und Telegram-Eingaben nutzen denselben Agentenkontext.
 - Doppelte Telegram-Updates erzeugen keine doppelten Terminaleingaben.
 - Neustart des Core beendet tmux-Sessions nicht.
 - Nicht autorisierte Telegram-Nutzer sehen keine Metadaten.
@@ -95,6 +107,7 @@ Umfang:
 - Transactional Outbox,
 - persistente Session-Input-Queues,
 - Output-Cursor und Backlog-Recovery,
+- per-Chat Rate Limiting und Backpressure,
 - stabile Fortschrittsnachrichten,
 - alle Benachrichtigungsmodi,
 - Interaction Manager,
@@ -116,6 +129,7 @@ Abnahme:
 - Schnelle Terminalausgabe erzeugt keine unkontrollierte Nachrichtenflut.
 - Raw Output kann mit Prüfsumme vollständig nachvollzogen werden.
 - Datenbank- oder Queue-Fehler führen nicht zu stiller Zustellung.
+- Outputstau stoppt die CLI nicht und bleibt vollständig lokal abrufbar.
 
 ## Phase 3: Git- und Projektkomfort
 
@@ -127,6 +141,7 @@ Umfang:
 - Branch-Namensregeln,
 - bestehende Worktrees auswählen,
 - Worktree-Status anzeigen,
+- `dirty`, `ahead`, `behind` und Konfliktzustände anzeigen,
 - sichere Archivierung,
 - Git-Diff als Artefakt,
 - Projektvorlagen,
@@ -141,6 +156,7 @@ Abnahme:
 - Roundtable zeigt jederzeit den exakten Pfad und Branch.
 - Stoppen einer Session löscht keinen Worktree automatisch.
 - Worktree-Entfernung ist explizit, geprüft und auditierbar.
+- Roundtable führt in dieser Phase keine automatischen Merges durch.
 
 ## Phase 4: macOS
 
@@ -151,7 +167,7 @@ Umfang:
 - signierbares Binary,
 - `launchd`-Integration,
 - Keychain-Secrets,
-- tmux-Installation oder eigener Unix Session Host,
+- tmux-Installation und Prüfung,
 - Pfad- und Berechtigungstests,
 - Update- und Diagnoseablauf,
 - Installer beziehungsweise Homebrew-Paket.
@@ -165,11 +181,16 @@ Abnahme:
 
 ## Phase 5: Windows
 
-Ziel: Native Windows-Nutzung und klar unterstützter WSL-Modus.
+Ziel: Zuerst ein klar unterstützter WSL/tmux-Modus, danach native
+Windows-Nutzung mit derselben Tunnel-Semantik.
 
 Umfang:
 
-- ConPTY Session Host,
+- WSL-Distribution erkennen und auswählen,
+- Roundtable, tmux und Agenten-CLIs innerhalb von WSL prüfen,
+- Windows-zu-WSL-Setup und Attach-Anleitung,
+- eindeutige WSL-Projektpfade,
+- anschließend ConPTY Session Host,
 - Named-Pipe-Protokoll,
 - persistente Output-Logs,
 - Core-Wiederverbindung,
@@ -177,11 +198,12 @@ Umfang:
 - Credential Manager/DPAPI,
 - Windows-Pfadmodell,
 - Claude/Codex-Erkennung unter Windows,
-- optional WSL-tmux-Backend,
 - signierter Installer.
 
 Abnahme:
 
+- Claude und Codex können zunächst in parallelen WSL/tmux-Sessions laufen.
+- Telegram-Eingaben sind beim Attach in WSL im nativen CLI-Verlauf sichtbar.
 - Claude und Codex können nativ in parallelen ConPTY-Sessions laufen.
 - Neustart des Core beendet separate Session Hosts nicht.
 - Texte und Tasten werden ohne Shell-Interpretation übertragen.
@@ -285,10 +307,10 @@ Jede Phase enthält:
 - Secret-Redaktion,
 - Interaction-Zustandsautomat.
 
-### Adapter-Contract-Tests
+### Contract-Tests
 
-Jeder Transport-, Agenten- und Runtime-Adapter muss dieselbe Contract-Suite
-bestehen.
+Jeder Transport Adapter, jede CLI-Definition und jedes Session Backend muss die
+zugehörige Contract-Suite bestehen.
 
 ### Transkript-Tests
 
@@ -315,15 +337,18 @@ Aufgezeichnete Ausgaben verschiedener Claude- und Codex-Versionen prüfen:
 ### End-to-End-Kernszenario
 
 1. Claude-Session A starten.
-2. Codex-Session B starten.
-3. Session B als Default festlegen.
+2. Prüfen, dass A automatisch Default ist.
+3. Codex-Session B starten und prüfen, dass A Default bleibt.
 4. Agent A und B erzeugen je eine Nachricht.
-5. Auf A antworten und Zustellung an A prüfen.
-6. Auf B antworten und Zustellung an B prüfen.
-7. Freie Nachricht senden und Zustellung an B prüfen.
-8. Core neu starten.
-9. Schritte 5 bis 7 wiederholen.
-10. Eine veraltete Freigabe ablehnen, ohne Eingabe zu senden.
+5. Auf A antworten und Zustellung in die tmux-Session A prüfen.
+6. Auf B antworten und Zustellung in die tmux-Session B prüfen.
+7. Freie Nachricht senden und Zustellung in die Default-Session A prüfen.
+8. Session B manuell als Default setzen.
+9. Freie Nachricht senden und Zustellung in die Session B prüfen.
+10. Beide Sessions lokal attachen und denselben CLI-Verlauf prüfen.
+11. Core neu starten.
+12. Reply- und Default-Routing erneut prüfen.
+13. Eine veraltete Freigabe ablehnen, ohne Eingabe zu senden.
 
 Dieses Szenario ist die dauerhafte Definition des zentralen Produktversprechens.
 
@@ -334,6 +359,8 @@ Ein Release ist nicht bereit, wenn:
 - eine Reply unter realistischen Bedingungen an die falsche Session gelangen
   kann,
 - doppelte Updates doppelte Eingaben erzeugen,
+- eine Messenger-Eingabe nicht im nativen CLI-Verlauf erscheint,
+- lokales Attach einen anderen Agentenkontext zeigt,
 - der Installer Secrets unsicher speichert,
 - laufende Sessions beim normalen Core-Update unnötig beendet werden,
 - eine Plattform nur durch nicht dokumentierte manuelle Entwicklungsschritte

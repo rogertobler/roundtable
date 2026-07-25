@@ -22,8 +22,8 @@ Frage gehört.
 
 ## Zielbild
 
-Roundtable macht aus einem privaten Messaging-Chat eine gemeinsame Inbox und
-Fernsteuerung für alle Agent-Sessions eines Benutzers.
+Roundtable macht aus einem privaten Messaging-Chat die gemeinsame
+Benutzeroberfläche für alle Agent-Sessions eines Benutzers.
 
 Der Benutzer kann unterwegs eine neue Session anlegen, Agent, Modell, Projekt
 und Namen auswählen und anschließend über denselben Chat mit mehreren Sessions
@@ -34,6 +34,17 @@ Freie Nachrichten ohne Reply werden an eine ausdrücklich festgelegte
 Default-Session gesendet. Die Default-Session ist eine Komfortfunktion und
 überschreibt niemals die Zuordnung einer Reply.
 
+Roundtable führt dabei keinen eigenen Dialog mit dem Agenten. Jede
+Roundtable-Session verweist auf eine echte laufende CLI-Session. Unter Linux,
+macOS und zunächst auch unter Windows via WSL wird sie in tmux gehalten.
+Agentenausgaben werden aus dieser Session in den Messenger geleitet;
+Benutzernachrichten werden literal in dieselbe Session zurückgeschrieben.
+
+Öffnet der Benutzer die Session lokal mit tmux, sieht er den nativen
+Claude-/Codex-Chatverlauf einschließlich der über Telegram gesendeten
+Nachrichten. Er kann lokal oder über den Messenger im selben Kontext
+weiterarbeiten.
+
 ## Produktversprechen
 
 Roundtable soll folgende Erfahrung ermöglichen:
@@ -42,10 +53,11 @@ Roundtable soll folgende Erfahrung ermöglichen:
 2. Telegram-Bot sicher mit dem eigenen Benutzer verbinden.
 3. Lokale Projekte freigeben.
 4. In Telegram eine neue Claude- oder Codex-Session zusammenklicken.
-5. Mehrere Sessions gleichzeitig arbeiten lassen.
-6. Fragen und Ergebnisse aller abonnierten Sessions in einer Inbox empfangen.
-7. Durch einfaches Antworten immer die richtige Session erreichen.
-8. Den Rechner später öffnen und dieselben Sessions im echten Terminal
+5. Roundtable legt die tmux-Session an und startet darin die vorhandene CLI.
+6. Mehrere Sessions gleichzeitig arbeiten lassen.
+7. Fragen und Ergebnisse aller abonnierten Sessions in einer Inbox empfangen.
+8. Durch einfaches Antworten immer die richtige Session erreichen.
+9. Den Rechner später öffnen und dieselben Sessions im echten Terminal
    weiterverwenden.
 
 ## Zielgruppen
@@ -116,6 +128,8 @@ Roundtable ist nicht:
 - ein eigener LLM- oder Coding-Agent,
 - eine autonome Entscheidungsinstanz,
 - eine zentrale Cloud, die Quellcode besitzen muss,
+- ein eigener oder paralleler Agenten-Chat,
+- ein Ersatz für den nativen Claude-/Codex-CLI-Verlauf,
 - ein vollständiger grafischer Terminal-Emulator in Telegram,
 - ein Ersatz für Git, Worktrees oder bestehende Agent-CLIs,
 - eine Garantie, dass jede unbekannte Terminal-TUI ohne Adapter perfekt
@@ -132,6 +146,10 @@ nicht später über eine ausdrücklich konfigurierte Regel erlaubt.
 Die Session ist die zentrale Einheit. Agent, Modell, Projekt, Runtime,
 Arbeitsverzeichnis, Berechtigungsprofil, Abonnement und Verlauf gehören zu ihr.
 
+Die tatsächliche Konversation gehört jedoch dem gestarteten Agentenprozess.
+Roundtable speichert Routing- und Auditkopien, führt aber keinen davon
+abweichenden Gesprächskontext.
+
 ### Transportunabhängig
 
 Telegram ist der erste Transport, aber nicht Bestandteil der Kerndomäne.
@@ -140,8 +158,22 @@ Sessions ansprechen können.
 
 ### Agentenunabhängig
 
-Claude Code und Codex erhalten Agent-Adapter. Andere interaktive Programme
-können später über denselben Vertrag eingebunden werden.
+Claude Code und Codex erhalten dünne CLI-Definitionen für Installation,
+Startargumente, Modellwahl und optionale Erkennung. Andere interaktive
+Programme können später über denselben Tunnelvertrag eingebunden werden.
+
+### Tunnelprinzip
+
+Der produktive Ein- und Ausgabepfad verläuft immer über die echte CLI-Session:
+
+```text
+Messenger -> Roundtable -> tmux/Session Backend -> Agenten-CLI
+Agenten-CLI -> tmux/Session Backend -> Roundtable -> Messenger
+```
+
+Hooks, Agenten-APIs oder strukturierte Ereignisse dürfen Status und
+Turn-Grenzen zuverlässiger erkennbar machen. Sie dürfen weder einen zweiten
+Chatverlauf erzeugen noch Benutzernachrichten an der CLI-Session vorbeiführen.
 
 ### Local-first
 

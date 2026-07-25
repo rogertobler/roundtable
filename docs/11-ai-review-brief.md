@@ -1,390 +1,375 @@
 # Roundtable: Kurzbeschreibung für externes AI-Review
 
+## Produkt in einem Satz
+
+Roundtable ist ein lokaler Multi-Agent-Chat-Router: Ein gemeinsamer
+Messenger-Chat tunnelt Nachrichten zu mehreren gleichzeitig laufenden nativen
+AI-CLIs; Replies gehen an die Ursprungssession, freie Nachrichten an die
+Default-Session.
+
 ## Ausgangslage
 
-Roundtable soll eine lokale, plattformübergreifende Steuerungs- und
-Kommunikationsebene für mehrere gleichzeitig laufende Terminal-Agenten werden.
+Ein Entwickler betreibt häufig mehrere Coding-Agenten gleichzeitig:
 
-Ein Benutzer kann beispielsweise parallel betreiben:
+- Claude Code implementiert eine Funktion.
+- Codex überprüft einen anderen Branch.
+- Eine weitere Claude-Session arbeitet in einem zweiten Projekt.
+- Eine Session wartet auf eine Freigabe.
 
-- eine Claude-Code-Session, die eine Funktion implementiert,
-- eine Codex-Session, die den Code überprüft,
-- eine weitere Claude-Session in einem anderen Projekt,
-- eine Session, die auf eine Freigabe wartet.
+Jeder Agent läuft als echte interaktive CLI auf dem lokalen Rechner oder einem
+privaten Server. Roundtable macht einen privaten Telegram-Bot-Chat zur
+gemeinsamen Inbox und Steuerungsoberfläche für alle diese Sessions. Später soll
+derselbe Router auch WhatsApp und weitere Messenger bedienen.
 
-Alle Sessions laufen als echte interaktive Terminalprozesse auf dem lokalen
-Rechner oder einem privaten Server. Roundtable verbindet diese Sessions mit
-einem privaten Telegram-Bot-Chat. Später sollen weitere Messaging-Kanäle wie
-WhatsApp hinzukommen.
+Roundtable ist kein eigener KI-Agent, kein Agenten-SDK und kein
+Terminalprodukt. Es ist ausschließlich Chat-Router, Sessionverwaltung und
+bidirektionaler Tunnel.
 
-Roundtable ist kein eigener KI-Agent. Es ist ein Router, Session-Manager,
-Terminal-Gateway und eine gemeinsame mobile Inbox.
+## Kernmodell
 
-## Zentrales Produktversprechen
+Jede Session besitzt:
 
-Jede Agent-Session besitzt ihren eigenen:
+- eindeutige ID und Namen,
+- Agent, zum Beispiel Claude Code oder Codex,
+- Modell,
+- Projekt und Arbeitsverzeichnis,
+- optionalen Git-Worktree,
+- Berechtigungsprofil,
+- Benachrichtigungsmodus,
+- echte dauerhafte CLI-Session.
 
-- Agenten, zum Beispiel Claude Code oder Codex,
-- Modellwert,
-- Namen,
-- Projektkontext,
-- Arbeitsordner oder Git-Worktree,
-- Terminalprozess,
-- Status,
-- Berechtigungsmodus,
-- Benachrichtigungsmodus.
-
-Unterschiedliche Agenten und mehrere Instanzen desselben Agenten können
-gleichzeitig laufen.
+In der ersten Implementierung wird beim Sessionstart im Hintergrund eine
+detached tmux-Session angelegt. Darin startet Roundtable die bereits lokal
+installierte und authentifizierte Agenten-CLI.
 
 ```text
-Reply auf eine Agentennachricht -> Ursprungssession
-Freie Nachricht ohne Reply      -> Default-Session
+Session A -> tmux -> Claude Code
+Session B -> tmux -> Codex
+Session C -> tmux -> Claude Code
 ```
 
-Der Benutzer arbeitet dadurch mit mehreren Agenten in einem einzigen
-Telegram-Chat, ohne bei jeder Antwort Agent oder Projekt neu auswählen zu
-müssen.
+Alle Sessions können gleichzeitig laufen.
 
-## Reply-basiertes Routing
+## Gemeinsamer Chat
 
-Roundtable speichert für jede an Telegram gesendete Nachricht die zugehörige
-Session-ID.
-
-Beispiel:
+Alle abonnierten Sessions schreiben in denselben privaten Telegram-Chat:
 
 ```text
-Claude Code · Backend Feature
+Claude · Backend Feature
+Soll ich die Migration jetzt ausführen?
 
-Soll ich die Datenbankmigration jetzt ausführen?
+Codex · Backend Review
+Ich habe zwei mögliche Fehler gefunden.
+
+Claude · Website
+Die mobile Navigation ist vorbereitet.
 ```
 
-Antwortet der Benutzer per Telegram-Reply:
+Die Herkunft jeder Nachricht wird dauerhaft als
+`externe_message_id -> session_id` gespeichert.
+
+Eine Session benötigt keinen eigenen Chat und kein Telegram Forum Topic.
+
+## Routing
+
+### Reply
+
+Antwortet der Benutzer auf eine Agentennachricht, wird die Antwort exakt an die
+tmux-Session dieser Nachricht gesendet:
 
 ```text
-Prüfe zuerst, ob die alte Spalte noch verwendet wird.
+Reply auf Claude-Nachricht A -> tmux-Session A
+Reply auf Codex-Nachricht B  -> tmux-Session B
 ```
 
-wird diese Antwort exakt an die Claude-Session `Backend Feature` gesendet.
+Die Default-Session spielt bei einer Reply keine Rolle.
 
-Eine Antwort auf eine Nachricht der Codex-Session wird entsprechend an Codex
-gesendet. Der Nachrichteninhalt wird nicht zur Zielbestimmung interpretiert;
-entscheidend ist ausschließlich die gespeicherte ID der beantworteten
-Telegram-Nachricht.
+### Freie Nachricht
 
-Kann eine Nachricht nicht eindeutig zugeordnet werden, darf Roundtable nicht
-raten. Stattdessen muss der Benutzer eine Session auswählen.
+Schreibt der Benutzer ohne Reply und ohne explizites Sessionziel, geht die
+Nachricht an die Default-Session.
 
-## Default-Session
+```text
+Nachricht ohne Referenz -> Default-Session
+```
 
-Der Benutzer kann eine Session ausdrücklich als Default festlegen.
+Die erste erfolgreich erstellte Session wird automatisch Default, solange noch
+kein Default existiert. Später erstellte Sessions ändern ihn nicht. Der
+Benutzer kann den Default manuell wechseln.
 
-Eine Telegram-Nachricht ohne Reply und ohne explizites Sessionziel wird an
-diese Default-Session gesendet. Die Default-Session ändert sich nicht
-automatisch durch Aktivität, neue Agentennachrichten oder Statuswechsel.
+Kann kein eindeutiges Ziel bestimmt werden, sendet Roundtable nichts und zeigt
+eine Sessionauswahl.
 
-Replies haben immer Vorrang vor der Default-Session.
+## Tunnelprinzip
 
-Gibt es keine gültige Default-Session, zeigt Roundtable ein Auswahlmenü mit den
-verfügbaren Sessions.
+Roundtable führt keinen eigenen Agenten-Chat.
 
-## Session-Erstellung über Telegram
+```text
+Telegram/WhatsApp
+      ↓ Benutzernachricht
+Roundtable Reply Router
+      ↓ literal Text + Taste
+tmux
+      ↓
+native Claude-/Codex-CLI
 
-Eine neue Session soll vollständig über ein geführtes Telegram-Menü erstellt
-werden können:
+native CLI-Ausgabe
+      ↓
+tmux Output Capture
+      ↓
+Roundtable
+      ↓
+Telegram/WhatsApp
+```
 
-1. Agent auswählen, zum Beispiel Claude Code oder Codex.
-2. Modell oder Agentenprofil auswählen.
+Jede Messengereingabe muss im echten nativen CLI-Verlauf sichtbar sein. Jede
+Agentenantwort im Messenger muss aus der Ausgabe dieser CLI stammen.
+
+Öffnet der Benutzer später:
+
+```text
+tmux attach-session -t <session>
+```
+
+sieht er denselben laufenden Claude-/Codex-Chat und kann direkt dort
+weiterschreiben. Lokale Eingaben und Messengereingaben erreichen denselben
+Agentenprozess und denselben Kontext.
+
+## Keine parallelen Agentenprotokolle
+
+Roundtable darf Agenten-Hooks oder strukturierte Ereignisse optional als
+Sensoren verwenden:
+
+- Session gestartet,
+- Turn abgeschlossen,
+- Approval wartet,
+- Agent beendet.
+
+Sie dürfen jedoch:
+
+- keinen zweiten Gesprächskontext erzeugen,
+- keine Benutzernachricht an tmux vorbeiführen,
+- keine Antwort außerhalb der nativen CLI beziehen,
+- keine Freigabe automatisch entscheiden.
+
+Fehlen Hooks, funktioniert der Tunnel weiter. Status- und Prompt-Erkennung kann
+dann weniger präzise sein.
+
+## Session-Erstellung
+
+Der Benutzer klickt sich im Messenger durch:
+
+1. Agent auswählen.
+2. Modell auswählen.
 3. Projekt auswählen.
-4. Arbeitsmodus auswählen:
-   - vorhandenes Projektverzeichnis,
-   - bestehender Git-Worktree,
-   - neuer Git-Worktree,
-   - nur lesen.
+4. Projektverzeichnis oder Worktree auswählen.
 5. Sessionname festlegen.
 6. Berechtigungsprofil auswählen.
-7. Optional eine erste Aufgabe eingeben.
-8. Zusammenfassung bestätigen und Session starten.
+7. Optional eine Startaufgabe eingeben.
+8. Zusammenfassung bestätigen.
 
-Später soll optional auch eine natürliche Kurzform möglich sein:
+Roundtable prüft:
 
-```text
-Neue Claude-Session mit Opus für DumbleScore,
-Name Backend Import Fix
-```
+- tmux ist installiert,
+- ausgewählte CLI ist installiert,
+- CLI ist lokal authentifiziert,
+- Projektpfad ist erlaubt,
+- Modell- und Startargumente sind gültig.
 
-Vor dem tatsächlichen Start wird daraus immer ein sichtbarer Sessionentwurf
-erstellt, den der Benutzer bestätigt.
+Danach werden tmux-Session, Output Capture und Agenten-CLI gestartet.
 
-## Agentenausgaben
+## Inhaltstreue Ein- und Ausgabe
 
-Agentenausgaben werden inhaltstreu an Telegram weitergegeben. Roundtable darf
-Texte nicht selbst umformulieren, beantworten oder durch ein Sprachmodell
-zusammenfassen.
+Messengertext wird literal in die CLI geschrieben, beispielsweise über einen
+tmux-Buffer mit anschließendem Paste und separatem Enter. Roundtable darf
+Messengertext niemals als Shellcode interpretieren.
 
-Erlaubt ist ausschließlich technische Transportaufbereitung:
+Die CLI-Ausgabe wird inhaltstreu weitergeleitet. Erlaubte technische
+Aufbereitung:
 
-- ANSI- und Cursorsteuerzeichen entfernen,
-- Spinner und ständig überschriebene Statuszeilen stabilisieren,
-- schnell aufeinanderfolgende Ausgabestücke zusammenführen,
-- lange Inhalte verlustfrei auf mehrere Nachrichten verteilen,
-- vollständige Ausgaben als Text- oder Diff-Datei senden,
-- Markdown und Codeblöcke für Telegram korrekt darstellen.
+- ANSI- und Cursorsteuerung verarbeiten,
+- Spinner stabilisieren,
+- überschreibende Zeilen zusammenführen,
+- schnelle Outputstücke bündeln,
+- lange Inhalte teilen oder als Datei senden,
+- bekannte Secrets nach Best Effort maskieren.
 
-Die unveränderte Terminalausgabe bleibt lokal verfügbar.
+Roundtable verwendet kein LLM zum Umschreiben oder Zusammenfassen des
+Nachrichtenpfads.
+
+Für die Erfassung sind vorgesehen:
+
+- `tmux pipe-pane` für den fortlaufenden Raw Stream,
+- `tmux capture-pane` für den aktuellen Screen State,
+- lokale append-only Logs mit Output-Cursor.
 
 ## Rückfragen und Freigaben
 
-Wenn ein Agent eine Frage oder Freigabe anzeigt, wird der originale Prompt an
-Telegram gesendet.
+Approvals bleiben echte CLI-Interaktionen:
 
-Beispiel:
+1. Roundtable erkennt im Output einen Prompt.
+2. Der unveränderte Prompt wird in den Messenger gesendet.
+3. Eine Reply geht an dieselbe tmux-Session.
+4. Freitext oder bekannte Tastenfolge wird zurückgesendet.
 
-```text
-Codex · Backend Review
-
-Codex möchte folgenden Befehl ausführen:
-
-npm test
-
-[Einmal erlauben]
-[Ablehnen]
-[Terminal anzeigen]
-```
-
-Roundtable entscheidet die Freigabe nicht selbst. Eine Schaltfläche ist nur
-eine deterministische Abkürzung für eine konkrete Terminaleingabe, zum Beispiel
-`1` plus Enter oder eine definierte Tastenfolge.
-
-Vor dem Senden wird geprüft, ob der Prompt noch aktuell ist. Alte oder bereits
-beantwortete Buttons dürfen keine zweite Eingabe auslösen.
-
-Eine freie Textantwort auf den Prompt wird unverändert an dieselbe Session
-weitergegeben.
-
-## Sessionübersicht
-
-Telegram zeigt alle Sessions mit mindestens:
-
-- Sessionname,
-- Agent und Modell,
-- Projekt,
-- Status,
-- Default-Markierung,
-- Benachrichtigungsmodus,
-- letzter Aktivität,
-- ausstehender Rückfrage oder Freigabe.
-
-Vorgesehene Zustände:
-
-- startet,
-- bereit,
-- arbeitet,
-- wartet auf Eingabe,
-- wartet auf Freigabe,
-- abgeschlossen,
-- unterbrochen,
-- gestoppt,
-- Fehler,
-- Verbindung verloren.
+Buttons dürfen nur angeboten werden, wenn ihre konkrete Terminalwirkung
+bekannt ist. Vor dem Senden prüft Roundtable, ob der CLI-Prompt noch aktuell
+ist. Alte Buttons dürfen keine zweite Eingabe auslösen.
 
 ## Sessionaktionen
 
-Pro Session sind unter anderem vorgesehen:
-
 - Nachricht senden,
-- als Default festlegen,
+- als Default setzen,
 - abonnieren oder stummschalten,
-- Benachrichtigungsmodus ändern,
-- Terminalbild anzeigen,
-- vollständige Ausgabe und Verlauf anzeigen,
-- Enter, Escape, Tab und Pfeiltasten senden,
-- `Ctrl+C` senden,
-- Agent unterbrechen oder fortsetzen,
-- Session neu starten,
-- Session stoppen oder archivieren,
-- lokal im echten Terminal öffnen.
+- Status aktualisieren,
+- optionalen CLI-Snapshot anzeigen,
+- Raw Output und Verlauf anzeigen,
+- Enter, Escape, Tab, Pfeiltasten und `Ctrl+C` senden,
+- Session unterbrechen, fortsetzen oder stoppen,
+- lokalen tmux-Attach-Befehl anzeigen,
+- Session umbenennen oder archivieren.
 
-Roundtable soll primär eine Agentensteuerung bleiben und kein vollständiger
-grafischer Terminalersatz werden.
+CLI-Snapshots sind Diagnosefunktionen. Der normale Arbeitsfluss bleibt der
+gemeinsame Messenger-Chat.
 
-## Projekte und parallele Arbeit
+## Plattformen
 
-Projekte werden lokal vorkonfiguriert und freigegeben. Eine Projektdefinition
-kann enthalten:
+### Linux
 
-- erlaubter Hauptpfad und Unterverzeichnisse,
-- Git-Repository,
-- erlaubte Agenten,
-- Standard-Agent und Standardmodell,
-- Standardberechtigungen,
-- Umgebungsvariablen-Referenzen,
-- Benachrichtigungseinstellungen.
+Roundtable und Agenten laufen direkt in tmux. Der Core läuft als
+`systemd --user` Dienst.
 
-Wenn mehrere Agenten am selben Repository arbeiten, sollen getrennte
-Git-Worktrees und Branches unterstützt werden. Roundtable zeigt jederzeit,
-welche Session in welchem Pfad und Branch arbeitet.
+### macOS
 
-## Plattformen und Installation
+Roundtable verwendet ebenfalls tmux und läuft als `launchd` User Agent.
 
-Roundtable soll für folgende Betriebsarten installierbar sein:
+### Windows
 
-- Linux-Desktop,
-- Linux-VPS,
-- macOS,
-- Windows nativ,
-- Windows mit WSL.
+Die erste Unterstützung verwendet WSL mit Roundtable, tmux und Agenten-CLIs in
+derselben Distribution.
 
-Geplante Runtime-Backends:
+Später kann ein nativer ConPTY Session Host tmux ersetzen. Er muss dieselbe
+Tunnel-Semantik liefern: dauerhafte CLI, Raw Output, literal Eingabe und lokal
+attachbarer identischer Verlauf.
 
-- Linux und macOS zunächst über tmux,
-- Windows nativ über ConPTY und einen separaten Session-Host-Prozess,
-- Windows mit WSL optional über tmux.
-
-Die Terminal-Runtime ist austauschbar. tmux darf deshalb nicht fest in die
-Produktlogik eingebaut sein.
-
-Ein separater Session Host oder tmux soll dafür sorgen, dass laufende Agenten
-bei einem Neustart des Telegram-Routers möglichst weiterlaufen.
-
-Die Installation soll später über ein ausführbares Programm und einen
-Einrichtungsassistenten funktionieren:
+## Architektur
 
 ```text
-roundtable install
-roundtable setup
-roundtable doctor
-roundtable start
-```
-
-## Geplante Architektur
-
-Roundtable trennt drei Adapterarten:
-
-```text
-TransportAdapter
+Transport Adapter
   Telegram
-  später WhatsApp, Web, Discord oder andere Kanäle
+  später WhatsApp
 
-AgentAdapter
-  Claude Code
-  Codex
-  später Gemini CLI, Aider, OpenCode oder Generic Terminal
+Message Router
+  Reply Mapping
+  explizites Sessionziel
+  Default-Session
 
-RuntimeBackend
-  tmux
-  ConPTY Session Host
-  WSL/tmux
-  später Remote Nodes oder Container
+Session Tunnel
+  Input Queue
+  Output Collector
+  tmux Backend
+
+Agent Definition
+  CLI-Erkennung
+  Startbefehl
+  Modellargument
+  optionale Output-/Hook-Hinweise
 ```
 
-Der Roundtable Core verwaltet:
-
-- Benutzer und Autorisierung,
-- Projekte,
-- Sessions,
-- Reply-Routing,
-- Default-Session,
-- Eingabe-Queues,
-- Status und Interaktionen,
-- Benachrichtigungen,
-- Verlauf und Audit.
-
-SQLite ist als lokale Datenbank vorgesehen. Große rohe Terminalausgaben können
-in lokalen Dateien liegen und über SQLite referenziert werden.
+SQLite speichert Routing, Default, Sessions, Input-Idempotenz, Output-Cursor,
+Abonnements und Audit. Die Datenbank ist nicht der maßgebliche
+Agentengesprächskontext.
 
 ## Sicherheit
 
-Da Agenten Dateien verändern und Befehle ausführen können, gelten mindestens:
+- nur freigegebene Messenger-Benutzer,
+- Pairing über lokalen Einmalcode,
+- standardmäßig privater Bot-Chat,
+- kanonische Projekt- und Pfad-Allowlist,
+- Betrieb ohne Root-/Administratorrechte,
+- literal Eingaben ohne Shell-Interpolation,
+- sichere Tokenablage,
+- Prompt- und Runtime-Prüfung vor Approval-Buttons,
+- keine geratenen Sessionziele,
+- agenteneigene Sandbox- und Approvalmodi,
+- optional OS-/Container-Sandbox für starke Schreibgrenzen,
+- vollständiges Audit kritischer Aktionen.
 
-- nur explizit freigegebene Telegram-Benutzer,
-- standardmäßig nur private Chats,
-- sichere Pairing-Prozedur,
-- Projekt- und Verzeichnis-Allowlist,
-- kein Betrieb als Root oder Administrator,
-- keine Shell-Auswertung von Telegramtexten,
-- sichere Speicherung von Bot-Token und API-Schlüsseln,
-- Maskierung bekannter Secrets vor Telegram-Ausgaben,
-- nachvollziehbare Freigabehistorie,
-- idempotente Nachrichten und Buttons,
-- keine automatische Produktionsänderung,
-- keine geratenen Nachrichtenziele.
+## Benachrichtigungen und Backpressure
 
-Vorgesehene Berechtigungsprofile:
-
-- Nur lesen,
-- Standard,
-- Vertrauenswürdig innerhalb klarer Projektgrenzen,
-- Eingeschränkt mit häufigen Bestätigungen.
-
-## Benachrichtigungen
-
-Pro Session sind folgende Modi geplant:
+Pro Session:
 
 - alle stabilen Ausgaben,
 - nur Rückfragen,
 - nur Freigaben,
-- nur Abschlussmeldungen,
+- nur Abschluss,
 - nur Fehler,
 - stumm.
 
-„Stumm“ beendet die Session nicht. Der lokale Verlauf bleibt erhalten.
+Telegram-Ausgaben werden pro Chat begrenzt, gebündelt und bei Bedarf als Datei
+gesendet. Ein Outputstau darf die native CLI nicht blockieren.
 
-## Spätere Erweiterungen
+## Abgrenzung zu ccgram
 
-- WhatsApp und weitere Messaging-Kanäle,
-- Datei-, Bild- und Screenshotübertragung,
-- Sprachnachrichten und Transkription,
-- automatische Git-Worktrees,
-- mehrere lokale oder entfernte Rechner,
-- Web-Dashboard,
-- mehrere Benutzer, Teams und Rollen,
-- Agent-zu-Agent-Übergaben,
-- Implementierungs- und Review-Pipelines,
-- geplante und wiederkehrende Aufgaben,
-- GitHub- und GitLab-Integration,
-- Kosten- und Tokenübersichten,
-- Monitoring- und Deployment-Integrationen.
+ccgram ist der engste bekannte Wettbewerber und tunnelt Telegram Forum Topics
+zu tmux/herdr-Sessions.
 
-## Nicht verhandelbare Kernregeln
+Roundtables zentrale Differenzierung:
 
-1. Der Agent gehört zur Session und ist keine globale Einstellung.
-2. Claude und Codex müssen gleichzeitig bedienbar sein.
-3. Replies werden an die Ursprungssession geroutet.
-4. Freie Nachrichten gehen nur an die explizite Default-Session.
-5. Bei unklarer Zuordnung wird niemals geraten.
-6. Roundtable schreibt Agenten- oder Benutzerinhalte nicht um.
-7. Freigaben werden nicht selbstständig entschieden.
-8. Transport, Agent und Terminal-Runtime bleiben austauschbar.
-9. Linux, macOS und Windows gehören zum Zielprodukt.
-10. Der Grundbetrieb bleibt local-first.
+```text
+ccgram:
+  ein Telegram Topic = eine Session
+
+Roundtable:
+  ein privater Chat = gemeinsame Inbox
+  Reply = Ursprungssession
+  freie Nachricht = Default-Session
+```
+
+Weitere Ziele sind mehrere Transportkanäle, ein formales Projektmodell und
+Windows-Unterstützung.
+
+## Nicht verhandelbare Regeln
+
+1. Roundtable ist ein Multi-Agent-Chat-Router.
+2. Agent und Modell gehören zur Session.
+3. Jede Session ist eine echte native CLI.
+4. Messenger und lokales Terminal bedienen denselben Agentenprozess.
+5. Replies gehen an die tmux-Session der beantworteten Nachricht.
+6. Freie Nachrichten gehen an die Default-Session.
+7. Die erste Session wird initialer Default; spätere ändern ihn nicht.
+8. Roundtable führt keinen zweiten Agentenkontext.
+9. Inhalte und Approvals werden nicht umformuliert oder selbst entschieden.
+10. Hooks sind nur optionale Sensoren.
+11. Bei unklarer Zuordnung wird nicht geraten.
+12. Telegram ist der erste, aber nicht der einzige geplante Transport.
 
 ## Fragen an den Reviewer
 
-Bitte analysiere dieses Konzept kritisch und konkret:
+Bitte analysiere kritisch:
 
-1. Welche wichtigen Benutzerabläufe oder Funktionen fehlen?
-2. Wo siehst du die größten technischen Risiken?
-3. Welche Annahmen über Claude Code, Codex, tmux oder ConPTY könnten falsch
-   oder zu fragil sein?
-4. Wie würdest du das Reply-Routing und die Eingabe-Idempotenz absichern?
-5. Wie sollte zuverlässige Approval-Erkennung gestaltet werden, ohne Prompts
-   unsicher zu interpretieren?
-6. Welche Sicherheitsrisiken wurden übersehen?
-7. Welche Funktionen sollten bereits in die erste nutzbare Version und welche
-   bewusst später kommen?
-8. Ist die Trennung zwischen Transport-, Agent- und Runtime-Adaptern sinnvoll?
-9. Welche Technologie und Sprache würdest du für ein einfach installierbares
-   Linux-/macOS-/Windows-Produkt wählen und warum?
-10. Welche bestehenden Open-Source-Projekte oder Bibliotheken könnten als
-    Grundlage dienen?
-11. Was würde Roundtable gegenüber vorhandenen Telegram-Bridges und
-    agentenspezifischen Remote-Control-Lösungen klar differenzieren?
-12. Welche Änderungen würden das Produkt für externe Benutzer verständlicher,
-    sicherer und attraktiver machen?
+1. Ist ein zuverlässiger inhaltstreuer Tunnel über tmux für Claude Code und
+   Codex praktisch umsetzbar?
+2. Wie sollten `pipe-pane`, `capture-pane`, Raw Cursor und Screen State
+   kombiniert werden?
+3. Wie erkennt man stabile neue Agentenausgabe, ohne einen zweiten
+   Agentenkanal einzuführen?
+4. Wie lassen sich Texte inklusive Sonderzeichen und Mehrzeiligkeit sicher
+   literal in tmux einfügen?
+5. Welche Race Conditions entstehen bei gleichzeitiger lokaler und mobiler
+   Bedienung?
+6. Wie sollte Output-Backpressure für einen einzigen Telegram-Chat aussehen?
+7. Welche Teile von ccgram wären sinnvoll wiederverwendbar, ohne dessen
+   Topic-pro-Session-Modell zu übernehmen?
+8. Welche Sicherheitsrisiken des Tunnelmodells fehlen?
+9. Welche Funktionen gehören zwingend in den ersten Linux-MVP?
+10. Ist Go für Core, Telegram, SQLite und tmux-Steuerung die richtige Wahl?
+11. Wie sollte der Windows-WSL-Installationsweg gestaltet werden?
+12. Welche Tests beweisen, dass Messenger und lokales Terminal wirklich
+    denselben nativen Agentenkontext sehen?
 
-Bitte priorisiere deine Vorschläge nach:
+Bitte priorisiere Antworten als:
 
 - kritisch vor Implementierungsbeginn,
-- wichtig für die erste Version,
-- sinnvoll für spätere Versionen.
+- wichtig für den ersten MVP,
+- später sinnvoll.

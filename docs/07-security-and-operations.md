@@ -14,7 +14,7 @@ aber verhindern, dass:
 - Projekte außerhalb freigegebener Pfade gestartet werden,
 - Secrets unnötig über Telegram oder Logs ausgegeben werden,
 - alte Buttons erneut riskante Aktionen auslösen,
-- ein kompromittierter Adapter den gesamten Host unbeschränkt kontrolliert,
+- eine fehlerhafte CLI-Definition unsichere Startargumente erzeugt,
 - Sicherheitsprofile nur kosmetische UI-Einstellungen sind.
 
 ## Bedrohungsmodell
@@ -71,20 +71,20 @@ Ein Agent liest manipulierte Dateien und schlägt riskante Aktionen vor.
 Roundtable kann den Agenteninhalt nicht als vertrauenswürdig behandeln.
 Gegenmaßnahme:
 
-- Roundtable-Berechtigungsprofile unabhängig vom Agenten,
+- Roundtable-Profile auf sichere agenteneigene Modi und OS-Grenzen abbilden,
 - kritische Aktionen nicht allein aufgrund eines Agententexts freigeben,
 - originale Aktion und Zielkontext anzeigen,
 - Produktions- und Secretzugriffe standardmäßig ausschließen,
 - optional OS-Sandbox oder Container.
 
-### Schädlicher oder fehlerhafter Agent-Adapter
+### Schädliche oder fehlerhafte CLI-Definition
 
-Ein Adapter baut einen unsicheren Shellstring oder erkennt eine Freigabe falsch.
-Gegenmaßnahme:
+Eine Definition baut einen unsicheren Startbefehl oder erkennt eine Freigabe
+falsch. Gegenmaßnahme:
 
 - strukturierte Prozessargumente,
 - keine Shell als Standard,
-- kleine, prüfbare Adapteroberfläche,
+- kleine, prüfbare Definitionsoberfläche,
 - Capability Detection,
 - Tests mit aufgezeichneten Terminaltranskripten,
 - sichere Fallbacks ohne Approval-Buttons,
@@ -117,8 +117,8 @@ Gegenmaßnahme:
 ```mermaid
 flowchart LR
     TG[Telegram-Infrastruktur] -->|nicht vertraute Updates| RT[Roundtable]
-    RT -->|autorisierte Eingaben| SH[Session Host]
-    SH -->|Agentenprozess| AG[Agent]
+    RT -->|literale Eingaben| TM[tmux / Session Backend]
+    TM -->|native CLI| AG[Agent]
     AG -->|nicht vertrauenswürdiger Inhalt| PR[Projekt und Tools]
     RT -->|lokale Daten| DB[(SQLite / Logs)]
 ```
@@ -166,6 +166,11 @@ Jede Aktion prüft:
 Autorisierung findet im Core statt. Transportbuttons sind keine
 Sicherheitsgrenze.
 
+Roundtable kann als Tunnel nicht jeden internen Tool-Aufruf des Agenten selbst
+blockieren. Die tatsächliche Laufzeitgrenze wird durch agenteneigene
+Approval-/Sandboxmodi, Betriebssystemrechte, Container und Projektpfade
+erzwungen. Die Roundtable-UI darf keine stärkere Garantie behaupten.
+
 ## Berechtigungsprofile
 
 ### Nur lesen
@@ -177,7 +182,7 @@ Ziel:
 Regeln:
 
 - Agent in seinem restriktivsten sinnvollen Modus starten,
-- schreibende Roundtable-Aktionen blockieren,
+- Roundtable selbst schreibt ausschließlich Eingaben in die CLI,
 - Worktree-Erstellung nur als vorbereitende Benutzeraktion,
 - Shell- und Toolfreigaben nach Policy einschränken.
 
@@ -194,8 +199,7 @@ Regeln:
 
 - Dateiänderungen im Projekt erlaubt,
 - normale Tests und lokale Builds möglich,
-- riskante Git-, Netzwerk-, Paket-, Datenbank- und Serviceaktionen verlangen
-  Freigabe,
+- agenteneigener Approvalmodus verlangt Freigaben für riskante Aktionen,
 - Zugriffe außerhalb des Projekts blockiert oder bestätigt.
 
 ### Vertrauenswürdig
@@ -233,6 +237,11 @@ Roundtable behandelt Approvals als Terminalinteraktionen:
 - keine semantische Umdeutung,
 - keine automatische Zustimmung im Standard,
 - veralteten Terminalzustand erkennen.
+
+Der Prompt stammt aus dem aktuellen CLI-Bild. Eine Benutzerentscheidung wird
+als Text oder Tastenfolge über dieselbe tmux-Session zurückgesendet. Optionale
+Hooks dürfen Roundtable auf den Prompt aufmerksam machen, ihn aber nicht in
+einem zweiten Dialog beantworten.
 
 „Für diese Session erlauben“ darf nur angeboten werden, wenn entweder der Agent
 diese Option selbst anbietet oder Roundtable eine ausdrücklich dokumentierte
@@ -323,17 +332,16 @@ roundtable start
 
 - signiertes/notarisiertes Binary oder Homebrew-Paket,
 - `launchd` User Agent,
-- tmux-Abhängigkeit oder eigener Session Host,
+- tmux-Abhängigkeit prüfen oder installieren,
 - Keychain für Secrets.
 
 ### Windows
 
-- signierter Installer oder Paketmanager,
-- Roundtable Core plus Session Host,
-- Benutzer-Dienst oder klarer Autostartmodus,
-- ConPTY-Verfügbarkeit prüfen,
-- Credential Manager/DPAPI,
-- optionaler WSL-Modus.
+- erste Version über WSL mit Roundtable, tmux und Agenten-CLIs in derselben
+  Distribution,
+- Windows-Setup prüft WSL, tmux und Agenteninstallationen,
+- später signierter nativer Installer mit ConPTY Session Host,
+- Credential Manager/DPAPI für native Roundtable-Secrets.
 
 ### Container
 
@@ -350,6 +358,7 @@ Docker-outside-of-Docker müssen ausdrücklich dokumentiert und begrenzt werden.
 - Telegram-Konfiguration und Erreichbarkeit,
 - autorisierte Identitäten,
 - installierte Agenten und Versionen,
+- lokale Agentenauthentifizierung, soweit ohne Secretzugriff prüfbar,
 - verfügbare Runtime-Backends,
 - tmux oder ConPTY,
 - Projektpfade,
@@ -436,6 +445,23 @@ Runtimes und Output-Cursor wiederverbunden.
 
 Session wird als `disconnected` oder `error` markiert. Agent-Resume oder
 Runtime-Neustart wird angeboten.
+
+## Schutz vor unkontrollierter Aktivität
+
+Roundtable trennt Transport-Backpressure von Agentensteuerung:
+
+- Ein per-Chat Rate Limiter schützt Telegram vor zu vielen Nachrichten.
+- Coalescing und Datei-Fallback verhindern Outputverlust.
+- Ein großer Output-Backlog erzeugt eine Warnung, stoppt aber nicht automatisch
+  den Agenten.
+- Der Benutzer besitzt jederzeit `Ctrl+C`, Session Stop und einen globalen
+  Notstopp.
+- Optionale Zeit-, Turn- oder Inaktivitätslimits können pro Session aktiviert
+  werden.
+
+Eine hohe Zahl an Terminalzeilen ist kein verlässlicher Indikator für
+Tokenkosten. Roundtable sendet daher nicht aufgrund einer willkürlichen
+Nachrichtenanzahl automatisch `SIGSTOP`.
 
 ### Datenbank nicht schreibbar
 

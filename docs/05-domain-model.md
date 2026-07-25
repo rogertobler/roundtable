@@ -6,6 +6,11 @@ Die logische Session ist dauerhaft und stabil. Runtime-Prozesse,
 Telegram-Nachrichten und Agenteninstanzen können ersetzt oder wiederverbunden
 werden, ohne dass sich die Session-ID ändert.
 
+Die logische Session ist kein eigener Agenten-Chat. Ihr aktiver
+`RuntimeInstance` verweist auf die echte native CLI-Session. Nachrichten in
+SQLite sind Routing-, Anzeige- und Auditkopien; der laufende Agentenkontext
+bleibt in der CLI.
+
 Alle internen Primärschlüssel sind zufällige, nicht erratbare IDs. Anzeigenamen
 und Aliase sind veränderbar und werden niemals als alleinige technische
 Identität verwendet.
@@ -96,7 +101,7 @@ AgentProfile
 
 Ein Profil beschreibt eine wiederverwendbare Startkonfiguration. Die
 tatsächlich gestartete Session speichert zusätzlich einen Snapshot der
-relevanten Werte.
+relevanten Werte. Das Profil beschreibt eine CLI und keinen API-Client.
 
 ### Session
 
@@ -113,7 +118,8 @@ Session
   workingDirectory
   gitBranch
   gitWorktreePath
-  runtimeBackend
+  sessionBackend
+  externalCliSessionId
   permissionProfileId
   notificationDefault
   lifecycleStatus
@@ -129,6 +135,10 @@ Session
 
 `agentType` und `model` gehören zwingend zur Session. Dadurch sind parallele
 Claude- und Codex-Sessions natürlich darstellbar.
+
+`externalCliSessionId` ist optional und enthält eine agenteneigene
+Resume-Kennung. Sie ergänzt die tmux-Runtime-ID, ersetzt sie aber nicht als
+Tunnel.
 
 Lebenszyklus und Interaktionszustand sollten intern getrennt werden. Eine
 Session kann beispielsweise einen laufenden Prozess besitzen und gleichzeitig
@@ -159,6 +169,10 @@ RuntimeInstance
 Ein Neustart erzeugt eine neue Runtime-Generation unter derselben Session.
 Historische Runtimeinstanzen bleiben für Audit und Logzuordnung erhalten.
 
+In der ersten Implementierung ist `externalRuntimeId` die kontrollierte
+tmux-Session-ID. Genau eine aktive Runtimeinstanz ist das schreibbare Ziel für
+Messenger-Replies.
+
 ### DefaultSession
 
 ```text
@@ -179,6 +193,10 @@ UNIQUE(userId, transportIdentityId)
 
 Damit gibt es pro Benutzer und Kanal-/Chatkontext höchstens eine
 Default-Session.
+
+Existiert beim erfolgreichen Erstellen der ersten Session noch kein Datensatz,
+wird er atomar für diese Session angelegt. Weitere Sessionstarts ändern ihn
+nicht.
 
 ### Subscription
 
@@ -240,6 +258,11 @@ Arten:
 - Datei,
 - Terminal-Snapshot,
 - Systemereignis.
+
+Diese Nachrichten bilden nicht den maßgeblichen Agenten-Thread. Jede
+`user_to_agent`-Nachricht muss zusätzlich als `SessionInput` in die native CLI
+geschrieben werden; jede `agent_to_user`-Nachricht muss auf erfasste
+CLI-Ausgabe zurückführbar sein.
 
 ### TransportMessage
 
@@ -382,6 +405,10 @@ RawOutputSegment
 Große Rohdaten liegen bevorzugt in append-only Dateien. Die Datenbank verwaltet
 Index, Cursor und Integrität.
 
+RawOutputSegments stammen immer vom aktiven Session Backend, zunächst
+`tmux pipe-pane`. Optionale Hooks dürfen Ereignisse referenzieren, erzeugen aber
+keine alternativen Agentennachrichten.
+
 ### SessionEvent
 
 ```text
@@ -495,6 +522,13 @@ Evidenz wird auf `unknown` zurückgestuft.
     bevor der Benutzer Fortsetzen oder Neustart bestätigt.
 12. Projekt- und Benutzerautorisierung wird bei jeder Aktion geprüft, nicht nur
     beim Session-Start.
+13. Eine Messenger-Eingabe erreicht den Agenten ausschließlich über die aktive
+    native CLI-Session.
+14. Eine Agentennachricht besitzt eine Herkunft im erfassten CLI-Output.
+15. Die erste erfolgreich erstellte Session wird Default, wenn noch kein
+    Default existiert; spätere Sessions ändern den Default nicht.
+16. Ein lokales Attach erzeugt keine zweite Session und keinen zweiten
+    Agentenkontext.
 
 ## Persistenztransaktionen
 

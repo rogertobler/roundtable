@@ -1,389 +1,448 @@
-# Agenten und Terminal-Runtimes
+# Agenten-CLIs und Session-Tunnel
 
 ## Zentrale Regel
 
-Der Agent ist eine Eigenschaft der Session.
+Der Agent ist eine Eigenschaft der Session, und jede Session ist ein Tunnel zu
+einer echten nativen CLI.
 
 ```text
-Session A -> Claude Code -> Modell Opus
-Session B -> Codex       -> konfiguriertes GPT-Modell
-Session C -> Claude Code -> Modell Sonnet
+Session A -> tmux -> Claude Code -> Modell Opus
+Session B -> tmux -> Codex       -> konfiguriertes Modell
+Session C -> tmux -> Claude Code -> Modell Sonnet
 ```
 
-Alle Sessions können gleichzeitig laufen. Der Telegram-Transport behandelt sie
-gleich; Unterschiede werden ausschließlich durch Sessiondaten, Agent-Adapter
-und Runtime-Fähigkeiten abgebildet.
+Alle Sessions können gleichzeitig laufen. Der Benutzer bedient sie über einen
+gemeinsamen Messenger-Chat. Eine Reply wählt die zugehörige Session; eine freie
+Nachricht geht an den Default.
 
-## Trennung von Agent und Runtime
+## Kein eigener Agenten-Client
 
-Agent und Runtime lösen verschiedene Probleme:
+Roundtable:
 
-- Der **Agent-Adapter** weiß, wie Claude Code oder Codex gestartet und erkannt
-  wird.
-- Das **Runtime-Backend** weiß, wie ein interaktiver Terminalprozess auf einem
-  Betriebssystem gehalten und bedient wird.
+- startet die lokal installierte Agenten-CLI,
+- liest deren echte Terminalausgabe,
+- schreibt Benutzertext in dieselbe CLI,
+- hält Routing- und Auditmetadaten,
+- entscheidet keine Agentenantwort.
 
-Claude Code kann daher in tmux, einem nativen Session Host oder später in einem
-Container laufen, ohne dass das Telegram-Routing geändert wird.
+Roundtable:
 
-## AgentAdapter-Vertrag
+- baut keinen separaten API-Chat auf,
+- synchronisiert keine zwei Gesprächskontexte,
+- ersetzt nicht die native Sessionhistorie,
+- sendet Nachrichten nicht an tmux vorbei.
+
+Die CLI bleibt Quelle des laufenden Agentenkontexts. Roundtable ist der Tunnel.
+
+## Voraussetzungen pro Agent
+
+Bevor eine Session gestartet werden kann, muss in derselben Umgebung verfügbar
+sein:
+
+- ausführbare CLI,
+- gültige lokale Authentifizierung,
+- unterstützte oder benutzerdefinierte Modellkonfiguration,
+- Zugriff auf das freigegebene Projekt,
+- notwendige lokale Tools,
+- tmux beziehungsweise das gewählte Session Backend.
+
+Beispiele:
 
 ```text
-AgentAdapter
-  type() -> AgentType
-  displayName() -> string
-  detectInstallation(context) -> InstallationInfo
-  inspectCapabilities(context) -> AgentCapabilities
-  validateConfig(sessionSpec) -> ValidationResult
-  buildLaunchSpec(sessionSpec) -> ProcessLaunchSpec
-  buildResumeSpec(session, previousRuntime) -> ProcessLaunchSpec
-  classifyOutput(outputContext) -> AgentEvent[]
-  detectInteraction(screen, recentOutput) -> InteractionCandidate?
-  validateInteraction(candidate, currentScreen) -> bool
-  commands(session) -> AgentCommand[]
-  normalizeStatus(agentEvidence) -> SessionInteractionStatus
+claude --version
+codex --version
+tmux -V
 ```
 
-## AgentCapabilities
+Roundtable übernimmt bestehende CLI-Anmeldungen und Konfigurationen. Tokens
+werden nicht in die Roundtable-Projektkonfiguration kopiert.
 
-Ein Adapter meldet Fähigkeiten, statt dass der Core Agentennamen abfragt:
+## Agent Definition
+
+Eine Agent Definition hält nur das Wissen, das zum Betrieb der CLI im Tunnel
+nötig ist:
 
 ```text
-AgentCapabilities
-  supportsModelSelection
-  knownModels
-  acceptsInitialPrompt
-  supportsResume
-  supportsNativeHooks
-  supportsApprovalDetection
-  supportsStructuredEvents
-  supportsCostCommand
-  supportsCompactCommand
-  supportsClearCommand
-  supportsFileInput
-  supportsImageInput
+AgentDefinition
+  type()
+  displayName()
+  executableName()
+  detectInstallation()
+  detectVersion()
+  detectAuthentication()
+  modelOptions()
+  validateConfig()
+  buildLaunchCommand()
+  buildResumeCommand()
+  readinessHints()
+  outputHints()
+  knownInteractions()
+  nativeCommands()
 ```
 
-Unbekannte oder versionsabhängige Fähigkeiten bleiben deaktiviert, bis sie
-erkannt oder konfiguriert wurden.
-
-## Claude-Code-Adapter
-
-Geplanter Umfang:
-
-- lokale Installation und Version erkennen,
-- Modellparameter pro Session setzen,
-- projektbezogene Startargumente erzeugen,
-- bestehende Claude-Sitzungen soweit unterstützt fortsetzen,
-- bekannte Bereitschafts-, Arbeits- und Fragezustände erkennen,
-- Approval-Prompts erkennen und Optionen auf Eingaben abbilden,
-- optionale native Hooks nutzen, ohne sie zur einzigen Datenquelle zu machen,
-- agentenspezifische Kommandos wie `/compact`, `/clear` und `/cost` anbieten,
-- Änderungen zwischen Claude-Versionen über Capability Detection abfangen.
-
-Der Adapter darf sichtbare Claude-Texte nicht neu formulieren. Er darf
-Metadaten ergänzen und bekannte Terminaloptionen als Telegram-Buttons
-darstellen.
-
-## Codex-Adapter
-
-Geplanter Umfang:
-
-- Installation und Version erkennen,
-- Modell und weitere erlaubte Sessionoptionen setzen,
-- Projekt- und Sandboxkonfiguration pro Session berücksichtigen,
-- Resume-Funktionen verwenden, soweit von der installierten Version angeboten,
-- Fragen, Freigaben, Abschluss und Fehler erkennen,
-- Approval-Auswahlen auf konkrete Terminaleingaben abbilden,
-- agentenspezifische Befehle oder Modi als deklarierte Fähigkeiten anbieten.
-
-Auch hier darf Roundtable nicht voraussetzen, dass alle Versionen dieselben
-Prompts oder Tasten verwenden.
-
-## Generic-Terminal-Adapter
-
-Ein generischer Adapter ermöglicht beliebige interaktive Programme:
-
-- konfigurierbarer Startbefehl,
-- Arbeitsverzeichnis,
-- erlaubte Umgebungsvariablen,
-- Terminalausgabe,
-- Texteingabe und Grundtasten,
-- manuelle Statusführung.
-
-Ohne spezialisierten Adapter gibt es keine verlässliche automatische
-Approval-Erkennung. Der Benutzer kann aber Terminalansicht und direkte Eingabe
-verwenden.
-
-## Adapterregistrierung
-
-Adapter werden über eine Registry geladen:
+Der Startbefehl wird strukturiert modelliert:
 
 ```text
-AgentRegistry
-  claude-code -> ClaudeCodeAdapter
-  codex       -> CodexAdapter
-  generic     -> GenericTerminalAdapter
-```
-
-Spätere externe Plugins benötigen:
-
-- versionierte Adapter-API,
-- isolierte Konfiguration,
-- Capability Declaration,
-- sichere Prozessgrenzen,
-- Signatur- oder Vertrauensmodell.
-
-Eine dynamische Plugin-API ist keine Voraussetzung für die erste Version. Die
-internen Adaptergrenzen sollen sie jedoch nicht verhindern.
-
-## Startbefehl und Shell-Sicherheit
-
-Der Adapter liefert keinen unkontrollierten zusammengesetzten Shell-String,
-sondern:
-
-```text
-ProcessLaunchSpec
+LaunchCommand
   executable
   arguments[]
   workingDirectory
   environmentReferences[]
-  terminalSize
-  startupTimeout
+  terminalColumns
+  terminalRows
 ```
 
-Runtime-Backends starten Executable und Argumente strukturiert. Eine Shell wird
-nur verwendet, wenn ein ausdrücklich konfiguriertes Profil dies verlangt.
+Roundtable baut keinen frei interpolierten Shellstring aus Messengerdaten.
 
-Im Auditlog wird eine maskierte, menschenlesbare Darstellung gespeichert.
-Secretwerte werden niemals Teil dieser Darstellung.
+## Capability-Modell
 
-## Runtime-Backend-Vertrag
+CLI-Versionen unterscheiden sich. Eine Agent Definition meldet erkannte
+Fähigkeiten:
 
-Ein Runtime-Backend muss mindestens können:
+```text
+AgentCapabilities
+  supportsModelSelection
+  supportsResume
+  supportsNativeSlashCommands
+  supportsFileInput
+  supportsImageInput
+  hasOptionalLifecycleHooks
+  hasKnownApprovalLayout
+  hasKnownTurnBoundaryHints
+```
 
-- Verfügbarkeit prüfen,
-- Session erzeugen,
-- existierende verwaltete Sessions wiederfinden,
-- Text schreiben,
-- Tasten senden,
-- Bildschirm erfassen,
-- inkrementelle Ausgabe liefern,
-- Prozessstatus prüfen,
-- unterbrechen und stoppen,
-- Metadaten für Wiederverbindung speichern.
+Capabilities verbessern Bedienung und Erkennung. Keine Capability darf den
+Tunnelgrundsatz verändern.
 
-Optionale Fähigkeiten:
+## Claude-Code-Definition
 
-- lokale Attach-Anweisung,
-- mehrere Terminalclients erkennen,
-- Prozess nach Router-Neustart weiterhalten,
-- Fenstergröße ändern,
-- Signalweiterleitung,
-- Dateiupload in Sessionkontext,
-- Remote-Node-Verbindung.
+Geplanter Umfang:
 
-## Linux
+- Installation und Version erkennen,
+- lokale Claude-Authentifizierung prüfen, ohne Secrets auszugeben,
+- Modellargument pro Session setzen,
+- Projektverzeichnis und erlaubte Startargumente verwenden,
+- native Resume-Funktion einsetzen, wenn eine CLI-Session neu gestartet werden
+  muss,
+- sichtbare Bereitschaft und bekannte Interaktionen erkennen,
+- bekannte Tastenauswahlen für Approvals beschreiben,
+- native Befehle wie `/compact`, `/clear` und `/cost` anbieten,
+- optionale Hooks für Turn-Ende, Status und Approval-Hinweise verwenden.
 
-### Erste Implementierung: tmux
+Normale Telegram-Nachrichten werden als Eingabe in die Claude-CLI geschrieben.
+Auch wenn ein Hook existiert, stammt die an Telegram gesendete Antwort aus
+derselben tmux-Ausgabe.
 
-tmux bietet:
+## Codex-Definition
 
-- dauerhafte Sessions unabhängig vom Router,
+Geplanter Umfang:
+
+- Installation und Version erkennen,
+- lokale Codex-Authentifizierung prüfen,
+- Modell- und erlaubte Startargumente pro Session setzen,
+- Sandbox- und Approvalmodus sichtbar konfigurieren,
+- native Resume-Funktion einsetzen,
+- Bereitschaft, Fragen, Ende und bekannte Approvals im CLI-Bild erkennen,
+- native Kommandos und Grundtasten anbieten,
+- optionale Ereignisquellen nur als Erkennungshilfe verwenden.
+
+Roundtable verwendet für den Kernfluss nicht `codex exec` und führt keinen
+separaten App-Server-Dialog. Telegram-Eingaben landen in der echten
+interaktiven Codex-CLI.
+
+## Weitere Agenten
+
+Ein neuer Agent benötigt mindestens:
+
+- ausführbaren Startbefehl,
+- Arbeitsverzeichnis,
+- Modellparameter, falls vorhanden,
+- Bereitschaftshinweis oder konservatives Timeout,
+- Output Capture über das Session Backend,
+- literal Texteingabe und Grundtasten.
+
+Ohne spezialisierte Erkennung funktioniert er als generische CLI-Session.
+Status und Approval-Buttons sind dann Best Effort, der Reply-Tunnel bleibt
+vollständig funktionsfähig.
+
+Geplante Kandidaten:
+
+- Gemini CLI,
+- Aider,
+- OpenCode,
+- Pi,
+- beliebige interaktive Shellprogramme.
+
+## tmux als erstes Session Backend
+
+tmux erfüllt die zentralen Anforderungen:
+
+- echter dauerhafter Agentenprozess,
+- unabhängig vom Roundtable-Core,
 - lokales Attach,
-- `send-keys` für Eingaben,
-- `capture-pane` für Bildschirm-Snapshots,
-- `pipe-pane` oder Logdateien für fortlaufende Ausgabe,
-- stabile Identifikation über eigene Namen und Metadaten.
+- literal Eingaben und Tasten,
+- aktueller Bildschirm,
+- Scrollback,
+- fortlaufendes Output Capture,
+- mehrere parallele Sessions.
 
-Roundtable verwendet einen eigenen tmux-Namensraum und speichert die echte
-tmux-ID. Anzeigenamen werden nicht direkt als einzige Runtime-ID verwendet.
+Roundtable verwendet einen eigenen Namensraum und eine unveränderliche
+technische Runtime-ID. Der sichtbare Sessionname ist nicht die einzige
+Identität.
 
-Geplante Operationen:
+Beispiel:
 
 ```text
-create        -> neue tmux-Session mit kontrollierter Shell/Agent
-writeText     -> literal senden, keine Shell-Auswertung
-sendKeys      -> definierte tmux key names
-captureScreen -> capture-pane inklusive gewünschter History
-streamOutput  -> pipe-pane Log plus persistierter Offset
-interrupt     -> C-c an aktives Pane
-stop          -> kontrolliertes Agentenende, dann tmux kill-session
-attachHint    -> tmux attach-session -t <runtime-id>
+Roundtable Session ID: 01J...
+Anzeigename: Backend Review
+tmux Runtime ID: roundtable-01J...
+Agent: codex
+Projekt: DumbleScore
 ```
 
-Risiken:
+## Sessionstart
 
-- `capture-pane` allein verliert flüchtige Ausgaben,
-- `pipe-pane` muss vor relevanter Ausgabe aktiv sein,
-- Vollbild-TUIs erzeugen viele Cursoroperationen,
-- lokales und Telegram-basiertes Schreiben kann sich überschneiden,
-- Shell-Quoting darf Benutzereingaben nicht verändern.
+Der Startablauf:
 
-Deshalb werden Raw Stream und Screen Snapshot getrennt behandelt.
+1. Benutzer wählt Agent, Modell, Projekt und Sessionname.
+2. Roundtable prüft Allowlist, Arbeitsverzeichnis, tmux und CLI.
+3. Roundtable erzeugt eine technische Runtime-ID.
+4. Roundtable legt eine detached tmux-Session an.
+5. Roundtable konfiguriert eine ausreichend große History.
+6. Roundtable aktiviert den fortlaufenden Outputpfad.
+7. Roundtable startet die CLI im Projektverzeichnis.
+8. Roundtable prüft Prozess und Startbereitschaft.
+9. Roundtable speichert die Sessionzuordnung.
+10. Ist es die erste Session ohne vorhandenen Default, wird sie Default.
+11. Eine optionale Startaufgabe wird literal in die CLI geschrieben.
 
-### Später: eigener Unix Session Host
+Schlägt ein Schritt fehl, wird keine fälschlich laufende logische Session
+angezeigt.
 
-Ein eigener PTY-Host kann langfristig plattformübergreifend konsistentere
-Semantik bieten. tmux bleibt dennoch ein wertvolles Backend für Benutzer, die
-direktes Attach und maximale Prozesspersistenz wünschen.
+## Eingaben
 
-## macOS
-
-tmux ist technisch geeignet, wird aber nicht standardmäßig mit macOS
-ausgeliefert. Der Installer kann:
-
-- eine vorhandene tmux-Installation verwenden,
-- tmux als klar benannte Voraussetzung installieren,
-- oder später den eigenen PTY Session Host nutzen.
-
-Der Roundtable-Daemon läuft als `launchd`-Benutzerdienst. Projektzugriffe müssen
-macOS-Dateisystem- und Datenschutzberechtigungen berücksichtigen.
-
-## Windows
-
-### Native Unterstützung
-
-Windows verwendet ConPTY für moderne interaktive Konsolenprogramme. Da ein
-ConPTY-Kontext an seinen Hostprozess gebunden ist, sollte jede dauerhafte
-Session von einem separaten `roundtable-session-host` gehalten werden.
-
-Der Session Host:
-
-- besitzt den ConPTY-Handle,
-- startet den Agentenprozess,
-- schreibt Raw Output in ein lokales Append-only-Log,
-- bietet eine lokale Named Pipe für Eingaben und Status,
-- bleibt bei einem Neustart des zentralen Routers am Leben,
-- authentifiziert wiederverbindende Roundtable-Prozesse,
-- beendet sich nur nach Sessionregel oder kontrollierter Stop-Aktion.
-
-Damit ist die Lebensdauer einer Session nicht untrennbar mit der
-Telegram-Verbindung gekoppelt.
-
-### WSL-Unterstützung
-
-Alternativ kann Roundtable Agenten innerhalb von WSL und tmux ausführen.
-Roundtable muss deutlich zeigen:
-
-- ob eine Session nativ oder in WSL läuft,
-- welches Dateisystem und welcher Pfad verwendet wird,
-- welcher Agent innerhalb dieser Umgebung installiert sein muss.
-
-Windows-Pfade und WSL-Pfade dürfen nicht blind ineinander umgerechnet werden.
-
-## Runtime-Auswahl
-
-Ein Projekt oder Benutzer kann eine Priorität konfigurieren:
+Roundtable modelliert Eingaben getrennt:
 
 ```text
-Linux:  tmux -> unix-session-host
-macOS:  tmux -> unix-session-host
-Windows: conpty-session-host -> wsl-tmux
-```
-
-Die tatsächliche Auswahl wird vor dem Session-Start angezeigt und an der
-Session gespeichert.
-
-## Persistenz und Wiederverbindung
-
-Nach einem Roundtable-Neustart:
-
-1. Datenbank öffnen und unvollständige Transaktionen prüfen.
-2. aktive Runtimeinstanzen laden.
-3. Runtime-Backends nach ihren externen IDs fragen.
-4. Identität des Runtimekontexts validieren.
-5. Output-Cursor ab gespeicherter Position fortsetzen.
-6. Status aktualisieren.
-7. fehlende Runtimes als `disconnected`, nicht sofort als `stopped`, markieren.
-8. Wiederherstellungsoptionen anbieten.
-
-Eine neu entdeckte Runtime darf nur dann automatisch verbunden werden, wenn
-eine kryptografische oder ausreichend starke lokale Zuordnung vorhanden ist.
-
-## Import bestehender Sessions
-
-Die Übernahme einer bereits laufenden Session ist backendabhängig:
-
-### tmux
-
-Roundtable kann Sessions auflisten und Bildschirm, Pane-Prozess sowie
-Arbeitsverzeichnis anzeigen. Der Benutzer wählt:
-
-- welche tmux-Session übernommen wird,
-- welcher Agent darin läuft,
-- welches Projekt zugeordnet wird,
-- welcher Roundtable-Sessionname verwendet wird.
-
-Historische Ausgabe vor Aktivierung von `pipe-pane` kann unvollständig sein.
-
-### ConPTY
-
-Beliebige fremde ConPTY-Sessions können normalerweise nicht sicher übernommen
-werden. Import ist primär für bereits von einem Roundtable Session Host
-verwaltete Sessions vorgesehen.
-
-### Agent Resume
-
-Falls die physische Runtime verloren ging, kann eine neue Runtime über die
-agenteneigene Resume-Funktion an denselben Agentenkontext anknüpfen. Dies ist
-eine neue Runtime-Generation und muss sichtbar vom bloßen Wiederverbinden
-unterschieden werden.
-
-## Approval-Erkennung
-
-Es gibt drei Evidenzstufen:
-
-1. **Strukturiertes Agentenereignis:** höchste Verlässlichkeit.
-2. **Bekannter Prompt plus Screen-Fingerprint:** verwendbar für Buttons.
-3. **Heuristische Textanalyse:** nur als Hinweis; direkte Texteingabe und
-   Terminalansicht bevorzugen.
-
-Ein Approval-Button ist nur aktiv, wenn die konkrete Terminalwirkung bekannt
-ist. Bei Unsicherheit sendet Roundtable den Originalprompt als routbare
-Nachricht ohne semantischen Button.
-
-## Terminaleingaben
-
-Eingaben werden als strukturierte Operationen modelliert:
-
-```text
-WriteText("prüfe zuerst die Tests")
+WriteLiteral("Prüfe zuerst die Tests")
 SendKey(Enter)
+SendKey(Escape)
 SendKey(CtrlC)
 SendKeys([ArrowDown, ArrowDown, Enter])
 ```
 
-Text wird literal geschrieben. Er darf nicht als Shellbefehl auf der
-Roundtable-Seite ausgewertet werden.
+Für normale Messengernachrichten:
 
-## Gleichzeitige lokale Bedienung
+1. Text als Daten in einen tmux-Buffer laden.
+2. Buffer in das Ziel-Pane einfügen.
+3. Enter separat senden.
 
-Roundtable verhindert nicht, dass ein Benutzer dieselbe tmux-Session lokal
-öffnet. Es gelten folgende Regeln:
+Dadurch werden Shell-Metazeichen nicht von Roundtable ausgewertet.
 
-- Roundtable serialisiert seine eigenen Eingaben.
-- Lokale Tastendrücke können nicht zuverlässig in dieselbe Queue gezwungen
-  werden.
-- Eine aktuelle Terminalansicht wird vor veralteten Approval-Aktionen geprüft.
-- Die UI zeigt lokale Attach-Informationen, soweit erkennbar.
-- Agenteninteraktionen können als `superseded` markiert werden, wenn sich der
-  Bildschirm nach lokaler Eingabe geändert hat.
+Mehrzeilige Nachrichten benötigen eine definierte Paste-Strategie, die mit den
+unterstützten Agenten-CLIs getestet wird.
 
-## Agent-zu-Agent-Workflows
+## Ausgaben
 
-Spätere Workflows verwenden normale Sessions und explizite Übergaben:
+### Raw Stream
+
+`tmux pipe-pane` schreibt den fortlaufenden Terminaldatenstrom in einen
+kontrollierten lokalen Outputpfad. Roundtable verfolgt einen Byte- oder
+Sequenzcursor.
+
+### Screen State
+
+`tmux capture-pane` liefert den aktuellen sichtbaren Zustand einschließlich
+eines begrenzten Scrollbacks. Er dient:
+
+- der optionalen CLI-Snapshot-Funktion,
+- der Erkennung überschreibender TUI-Zeilen,
+- der Prüfung von Approvals,
+- der Wiederverbindung,
+- der Diagnose.
+
+### Native Agentenhistorie
+
+Die Agenten-CLI selbst hält ihren Gesprächskontext. tmux zeigt den laufenden
+nativen Verlauf. Roundtable hält zusätzlich Raw Logs, damit ältere Ausgabe auch
+nach Erreichen der tmux-History-Grenze abrufbar bleibt.
+
+Der Roundtable-Verlauf ist eine Routing- und Auditkopie, nicht der
+maßgebliche Agentenkontext.
+
+## Stabilisierung für Messenger
+
+Ein Terminaldatenstrom enthält:
+
+- ANSI-Farben,
+- Cursorbewegungen,
+- Spinner,
+- Fortschrittsupdates,
+- Vollbildneuzeichnungen,
+- Eingabe-Echos.
+
+Roundtable darf diese technischen Artefakte normalisieren. Es darf jedoch keine
+Sätze umformulieren oder Inhalte durch ein LLM zusammenfassen.
+
+Der Processor benötigt pro Session:
+
+- Raw-Cursor,
+- letzten Screen State,
+- zuletzt gesendeten stabilen Bereich,
+- Ruhefenster,
+- optionale agentenspezifische Turn-Hinweise.
+
+## Optionale Hooks
+
+Hooks sind Sensoren, keine Transportstrecke.
+
+Sie können signalisieren:
+
+- Sessionstart,
+- Turn-Ende,
+- Rückfrage,
+- Approval,
+- Toolfehler,
+- Agentenende.
+
+Roundtable nutzt den Hinweis, um die zugehörige tmux-Ausgabe schneller oder
+präziser zu lesen. Der Hooktext wird nicht als eigener paralleler
+Agentenverlauf behandelt.
+
+Wenn Hooks fehlen oder inkompatibel sind:
+
+- normale Ein- und Ausgabe funktioniert weiter,
+- Status kann weniger präzise sein,
+- Approval-Buttons können entfallen,
+- der Benutzer kann weiterhin per Reply oder CLI-Snapshot antworten.
+
+## Approvals
+
+Approvals werden aus der echten CLI-Session weitergeleitet:
+
+1. Output oder optionaler Hook weist auf einen Prompt hin.
+2. Roundtable liest den aktuellen Screen State.
+3. Der unveränderte Prompt wird in den Messenger gesendet.
+4. Reply-Routing bindet die Antwort an dieselbe Session.
+5. Freitext wird literal in die CLI geschrieben.
+6. Ein Button sendet ausschließlich eine bekannte Tastenfolge.
+7. Vor Buttons wird geprüft, ob der Prompt noch aktuell ist.
+
+Roundtable entscheidet nicht, ob eine Aktion erlaubt werden soll.
+
+## Lokale und mobile Bedienung gleichzeitig
+
+Der Benutzer darf dieselbe tmux-Session lokal attachen.
+
+Folgen:
+
+- lokale Eingaben erreichen unmittelbar den Agenten,
+- Telegram-Eingaben erreichen denselben Prozess,
+- Roundtable serialisiert nur seine eigenen Eingaben,
+- lokale Eingaben können offene Telegram-Buttons veralten lassen,
+- der Screen State wird vor einer Buttonaktion erneut geprüft,
+- Antworten auf lokale Eingaben erscheinen ebenfalls im beobachteten Output.
+
+Eine Session darf niemals dupliziert werden, nur weil der Benutzer sie lokal
+öffnet.
+
+## Wiederverbindung
+
+Nach einem Roundtable-Neustart:
+
+1. gespeicherte Session- und Runtime-IDs laden,
+2. Existenz der tmux-Session prüfen,
+3. primären Prozess und Arbeitsverzeichnis validieren,
+4. Output Capture prüfen oder erneuern,
+5. ab gespeichertem Cursor weiterlesen,
+6. Status neu bestimmen.
+
+tmux bleibt währenddessen aktiv.
+
+Eine gleichnamige fremde tmux-Session darf nicht automatisch adoptiert werden.
+
+## Bestehende Sessions übernehmen
+
+Roundtable kann tmux-Sessions auflisten und für eine kontrollierte Übernahme
+anzeigen:
+
+- technische tmux-ID,
+- Session-/Fenstername,
+- aktueller Vordergrundprozess,
+- Arbeitsverzeichnis,
+- Bildschirmvorschau.
+
+Der Benutzer bestätigt Agent, Projekt und Roundtable-Name. Historische Ausgabe
+vor Aktivierung des Output Capture kann unvollständig sein.
+
+## Stoppen und Fortsetzen
+
+Stoppen ist abgestuft:
+
+1. Agentennativer Exit, wenn sicher verfügbar.
+2. `Ctrl+C` für eine laufende Aktion.
+3. kontrolliertes Ende des CLI-Prozesses.
+4. tmux-Session beenden nach Bestätigung.
+
+Roundtable löscht Worktrees oder Logs nicht automatisch.
+
+Wurde nur der Agentenprozess beendet, kann die Session mit dessen nativer
+Resume-Funktion in derselben oder einer neuen Runtime-Generation fortgesetzt
+werden. Dies wird sichtbar protokolliert.
+
+## Linux
+
+Linux ist die erste Zielplattform:
+
+- tmux direkt,
+- Roundtable als `systemd --user` Dienst,
+- lokale Unix-Sockets,
+- Agenten-CLIs im selben Benutzerkontext.
+
+## macOS
+
+macOS verwendet ebenfalls tmux:
+
+- vorhandenes tmux nutzen oder als Voraussetzung installieren,
+- Roundtable als `launchd` User Agent,
+- Keychain für Roundtable-Secrets,
+- Agenten-CLI und tmux unter demselben Benutzer.
+
+## Windows
+
+### Erste Unterstützung: WSL und tmux
+
+Roundtable, tmux, Projekte und Agenten-CLIs laufen gemeinsam in WSL. Der
+Installer beziehungsweise Setup-Assistent erklärt:
+
+- welche WSL-Distribution verwendet wird,
+- wo das Projekt liegt,
+- dass die CLI innerhalb von WSL installiert und angemeldet sein muss,
+- wie die tmux-Session aus Windows geöffnet wird.
+
+### Native Unterstützung: ConPTY Session Host
+
+Später ersetzt ein eigener Session Host tmux:
+
+- hält ConPTY und Agentenprozess dauerhaft,
+- liefert Raw Stream und Screen State,
+- nimmt literal Text und Tasten über Named Pipe entgegen,
+- bietet `roundtable attach <session>` als lokale native Ansicht,
+- bleibt bei Core-Neustart aktiv.
+
+Das Backend muss denselben Agentenverlauf lokal und im Messenger sichtbar
+machen. Native Windows-Unterstützung ist kein App-Server-Sonderweg.
+
+## Agent-zu-Agent-Übergaben
+
+Spätere Workflows senden Nachrichten durch denselben Tunnel:
 
 ```text
-Claude implementiert
-  -> erzeugt Übergabeartefakt oder Diff
-  -> Benutzer oder Regel bestätigt Übergabe
-Codex reviewt
-  -> Review wird als Nachricht/Artefakt an Claude-Session übergeben
-Claude korrigiert
-  -> gemeinsamer Abschluss
+Claude-Session erzeugt ein Review-Artefakt
+  -> Roundtable adressiert eine Nachricht an Codex-Session
+  -> Nachricht wird in Codex-CLI geschrieben
+  -> Codex-Ausgabe erscheint in gemeinsamer Inbox
 ```
 
-Agenten kommunizieren nicht über magische globale Kontexte. Jede Übergabe wird
-als adressierte Nachricht mit Quelle, Ziel, Inhalt und Auditereignis
-modelliert.
+Quelle, Ziel und Inhalt werden protokolliert. Es entsteht kein unsichtbarer
+Agentenkanal außerhalb der echten CLI-Sessions.

@@ -36,40 +36,63 @@ Zu prüfen:
 - Agentenerkennung,
 - Lizenz und wiederverwendbare Komponenten.
 
-## CCBot
+## ccgram
 
 Link:
 
-- <https://github.com/six-ddc/ccbot>
+- <https://github.com/alexei-led/ccgram>
 
 Relevanz:
 
-- Telegram-Steuerung für Claude Code,
-- Verbindung zu tmux,
-- Sitzungen und Verlauf,
-- Benachrichtigungen,
-- Freigabeprompts mit Inline-Interaktionen,
-- Telegram Topics als Strukturierung.
+- engster bekannter Wettbewerber,
+- Telegram-zu-tmux/herdr-Tunnel,
+- Claude Code, Codex, Gemini, Pi und Shell gleichzeitig,
+- parallele Sessions,
+- Output-Monitoring und Tasteneingaben,
+- Freigabeprompts und optionale Claude-Hooks,
+- Session Recovery, Worktrees, Voice und Web-Dashboard,
+- Telegram Forum Topics als Sessionmodell.
+
+Zum Prüfzeitpunkt:
+
+- Release `v4.3.11`,
+- aktiv gepflegt,
+- MIT-Lizenzdatei im Repository.
 
 Abgrenzung:
 
-CCBot ist eine wichtige Referenz für Claude, tmux und Telegram. Roundtable
-definiert jedoch:
+ccgram bestätigt, dass ein dünner Tunnel über echte Multiplexer-Sessions
+praktisch funktioniert. Roundtable verwendet denselben fundamentalen Gedanken,
+definiert aber eine andere Chat-UX:
 
-- mehrere Agententypen als gleichwertige Sessioneigenschaft,
-- eine gemeinsame private Inbox ohne Topics als notwendige Grundlage,
+- ein einziger privater Bot-Chat als gemeinsame Inbox,
+- keine Telegram-Gruppe, Forum Topics oder Bot-Adminrechte als Voraussetzung,
 - persistentes Reply-Mapping,
-- Default-Session für freie Nachrichten,
-- plattformübergreifende Runtime-Backends einschließlich Windows,
-- kanalunabhängigen Core.
+- Reply auf Agentennachricht routet zur Ursprungssession,
+- freie Nachricht routet zur Default-Session,
+- erste Session wird initialer Default,
+- Telegram ist nur erster Transport; WhatsApp soll denselben Router nutzen,
+- Windows via WSL/tmux und später natives Session Backend,
+- formalisierte Projekt-, Benutzer- und Pfadgrenzen.
+
+Die Differenzierung ist damit nicht „Telegram steuert tmux“, sondern:
+
+> Ein gemeinsamer Multi-Agent-Chat multiplexiert viele echte CLI-Sessions über
+> Reply-Routing und Default-Session.
 
 Zu prüfen:
 
-- tmux Output Capture,
+- Architektur und Tests von `pipe-pane`/`capture-pane`,
 - Hook-Nutzung,
 - Approval-Zuordnung,
 - Sessionpersistenz,
-- Umgang mit Telegram-Limits.
+- Umgang mit Telegram-Limits,
+- welche MIT-lizenzierten Teile sinnvoll wiederverwendbar sind,
+- ob Fork, Teilübernahme oder eigenständige Implementierung langfristig
+  sinnvoller ist.
+
+Der Vorgänger <https://github.com/six-ddc/ccbot> bleibt als historische
+Referenz relevant.
 
 ## amux
 
@@ -147,6 +170,28 @@ Zu prüfen:
 - Verhalten bei Verbindungsverlust,
 - mögliche Überschneidungen mit nativen Agentenfunktionen.
 
+## Claude Code Channels
+
+Link:
+
+- <https://code.claude.com/docs/en/channels>
+
+Relevanz:
+
+- offizieller Telegram-/Discord-/iMessage-Kanal für eine laufende
+  Claude-Code-Session,
+- lokaler Claude-Kontext,
+- Pairing und Sender-Allowlist,
+- optionale Weiterleitung von Freigaben.
+
+Abgrenzung:
+
+Channels ist Claude-spezifisch und befindet sich in Research Preview.
+Roundtable verbindet mehrere Claude-, Codex- und weitere CLI-Sessions in einem
+gemeinsamen Chat. Channels und Hooks können als technische Referenz oder
+optionale Sensoren dienen, dürfen aber keinen zweiten Nachrichtenpfad neben der
+nativen CLI erzeugen.
+
 ## Schlussfolgerung
 
 Einzelne Teile der Roundtable-Idee existieren bereits:
@@ -164,15 +209,18 @@ gemeinsame Messaging-Inbox
   + mehrere parallele Sessions
   + Agent und Modell pro Session
   + Reply-Routing zur Ursprungssession
-  + Default-Session für freie Nachrichten
+  + erste Session als initialer Default
+  + manuell änderbare Default-Session für freie Nachrichten
   + inhaltstreue Freigaben und Antworten
-  + austauschbare Transport-, Agent- und Runtime-Adapter
+  + echter nativer CLI-Verlauf in jeder Session
+  + austauschbare Transport- und Session-Backends
   + Linux, macOS und Windows
 ```
 
 Diese Kombination ist die Produktgrenze. Roundtable sollte bestehende
-Open-Source-Projekte als technische Referenz nutzen, aber nicht deren
-Claude-only-, Topic-only- oder Unix-only-Annahmen in den Core übernehmen.
+Open-Source-Projekte als technische Referenz nutzen. Insbesondere darf
+ccgrams Topic-pro-Session-Modell nicht unbemerkt Roundtables zentralen
+Reply-Router ersetzen.
 
 ## Vorgehen bei weiterer Recherche
 
@@ -193,4 +241,5 @@ werden:
 
 Rechercheergebnisse beeinflussen die Implementierung, nicht die verbindlichen
 Roundtable-Invarianten. Insbesondere bleiben Agent-pro-Session,
-Reply-Priorität und keine geratenen Zustellungen bestehen.
+Reply-Priorität, initialer Default, echter CLI-Tunnel und keine geratenen
+Zustellungen bestehen.

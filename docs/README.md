@@ -6,17 +6,17 @@ Dieses Verzeichnis beschreibt die gemeinsame Produktvision und die geplante
 technische Architektur von Roundtable. Es ist die zentrale Referenz für alle
 Menschen und Agent-Sessions, die am Projekt arbeiten.
 
-Roundtable ist eine lokale, plattformübergreifende Steuerungs- und
-Kommunikationsebene für mehrere gleichzeitig laufende, interaktive
-Terminal-Agenten. Telegram ist der erste Kommunikationskanal. Claude Code und
-OpenAI Codex sind die ersten Agenten. Weitere Kanäle und Agenten sollen über
-Adapter ergänzt werden können.
+Roundtable ist ein lokaler, plattformübergreifender Multi-Agent-Chat-Router.
+Über einen gemeinsamen Messenger-Chat bedient der Benutzer mehrere gleichzeitig
+laufende AI-Agenten. Jeder Agent läuft weiterhin als echte interaktive CLI in
+einer dauerhaften Session. Telegram ist der erste Kommunikationskanal. OpenAI
+Codex und Claude Code sind die ersten Agenten.
 
 ## Die Produktidee in einem Satz
 
-> Roundtable verbindet Messaging-Kanäle mit dauerhaften Agent-Sessions:
-> Antworten werden an die Ursprungssession geroutet, freie Nachrichten an die
-> vom Benutzer festgelegte Default-Session.
+> Roundtable tunnelt Nachrichten zwischen einem gemeinsamen Messenger-Chat und
+> dauerhaften nativen Agenten-CLIs: Replies gehen an die Ursprungssession,
+> freie Nachrichten an die festgelegte Default-Session.
 
 ## Verbindliche Grundprinzipien
 
@@ -35,18 +35,28 @@ Adapter ergänzt werden können.
 5. **Freigaben bleiben Agenteninteraktionen.** Roundtable zeigt die originale
    Frage an und leitet die Benutzerantwort oder den zugeordneten Tastendruck an
    exakt dieselbe Session weiter.
-6. **Roundtable ist kein eigener KI-Agent.** Es ist Router, Session-Manager,
-   Terminal-Brücke, Inbox und Audit-Schicht.
-7. **Messaging ist keine rohe Terminalspiegelung.** Terminalartefakte wie
+6. **Roundtable ist ausschließlich Chat-Router und Tunnel.** Es besitzt keinen
+   eigenen Agentenkontext. Der einzige Agentendialog lebt in der nativen CLI.
+7. **Die CLI-Session bleibt vollständig direkt bedienbar.** Öffnet der Benutzer
+   die tmux-Session, sieht und bedient er denselben Verlauf, der über den
+   Messenger geroutet wird.
+8. **Messaging ist keine rohe Bildschirmspiegelung.** Terminalartefakte wie
    ANSI-Sequenzen, Spinner und wiederholt überschriebene Zeilen dürfen für die
    Darstellung normalisiert werden. Der semantische Inhalt bleibt unverändert,
    und die rohe Ausgabe wird lokal vorgehalten.
-8. **Installierbarkeit ist ein Produktmerkmal.** Roundtable soll auf Linux,
+9. **tmux ist der erste Session-Host.** Beim Start legt Roundtable im
+   Hintergrund eine tmux-Session an und startet darin die lokal installierte
+   Agenten-CLI. Unter Windows ist WSL/tmux der erste Weg; natives ConPTY folgt
+   mit derselben Tunnel-Semantik.
+10. **Agentenintegrationen bleiben dünn.** Agentenspezifisches Wissen dient
+    Startbefehl, Modellauswahl und optionaler Ereigniserkennung. Nachrichten
+    laufen immer durch die echte CLI-Session.
+11. **Installierbarkeit ist ein Produktmerkmal.** Roundtable soll auf Linux,
    macOS und Windows lokal sowie auf einem VPS betrieben werden können.
-9. **Lokale Kontrolle bleibt erhalten.** Agenten laufen auf dem Rechner des
+12. **Lokale Kontrolle bleibt erhalten.** Agenten laufen auf dem Rechner des
    Benutzers. Projekte, Zugangsdaten und vollständige Terminalausgaben müssen
    nicht an einen Roundtable-Cloud-Dienst übertragen werden.
-10. **Sicherheit ist standardmäßig restriktiv.** Nur freigegebene Benutzer,
+13. **Sicherheit ist standardmäßig restriktiv.** Nur freigegebene Benutzer,
     Projekte, Verzeichnisse und Aktionen werden zugelassen.
 
 ## Beispiel
@@ -84,8 +94,8 @@ Freie Nachricht ohne Reply
   Schnittstellen und Deployment
 - [05-domain-model.md](05-domain-model.md): Domänenobjekte, Zustände,
   Persistenz und Invarianten
-- [06-agents-and-runtimes.md](06-agents-and-runtimes.md): Agent-Adapter,
-  Terminal-Backends und Plattformstrategie
+- [06-agents-and-runtimes.md](06-agents-and-runtimes.md): Agenten-CLIs,
+  Session-Tunnel und Plattformstrategie
 - [07-security-and-operations.md](07-security-and-operations.md): Bedrohungsmodell,
   Berechtigungen, Installation und Betrieb
 - [08-roadmap.md](08-roadmap.md): Umsetzungsphasen, Abnahmekriterien und spätere
@@ -101,19 +111,19 @@ Freie Nachricht ohne Reply
 
 | Begriff | Bedeutung |
 | --- | --- |
-| Roundtable Core | Kanal- und plattformunabhängige Geschäftslogik |
+| Roundtable Core | Kanalunabhängiges Routing und Sessionverwaltung |
 | Transport | Kommunikationskanal wie Telegram oder später WhatsApp |
-| Session | Logische, dauerhaft identifizierbare Agenteninstanz |
+| Session | Zuordnung aus logischer ID und echter laufender CLI-Session |
 | Agent | Terminalprogramm wie Claude Code oder Codex |
-| Agent-Adapter | Agentenspezifischer Start, Fähigkeiten und Interaktionen |
-| Runtime | Technischer Host der interaktiven Terminal-Sitzung |
-| Session Host | Prozess oder Dienst, der eine PTY-Sitzung dauerhaft hält |
+| Agent-Definition | Dünne Beschreibung von CLI, Startargumenten und Erkennung |
+| Tunnel | Bidirektionaler Ein-/Ausgabepfad zwischen Chat und CLI |
+| Session Backend | Technischer Host der echten CLI, zunächst tmux |
 | Projekt | Vorkonfigurierter und freigegebener Arbeitskontext |
 | Default-Session | Ziel für freie Benutzernachrichten |
 | Reply-Routing | Zuordnung einer Antwort über die beantwortete Nachricht |
 | Inbox | Gemeinsamer privater Chat mit Ereignissen aller abonnierten Sessions |
 | Approval | Interaktive Freigabeanfrage des Agenten |
-| Raw Output | Unveränderte Ausgabe des Terminalprozesses |
+| Raw Output | Unveränderte Ausgabe derselben nativen CLI-Session |
 | Rendered Output | Für einen Transport technisch aufbereitete Darstellung |
 
 ## Status dieses Dokumentsatzes

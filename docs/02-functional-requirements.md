@@ -58,6 +58,7 @@ Vor dem Session-Start prüft Roundtable:
 
 - Verzeichnis existiert und ist erreichbar,
 - Agent ist installiert,
+- Agent ist in derselben Ausführungsumgebung wie tmux authentifiziert,
 - Modell- und Agentkonfiguration ist gültig,
 - Git-Anforderungen sind erfüllt,
 - Runtime-Backend steht zur Verfügung,
@@ -93,11 +94,19 @@ Optionale Auswahl:
 - Runtime-Backend,
 - zusätzliche erlaubte Agentenargumente.
 
+Nach Bestätigung legt Roundtable eine echte tmux-Session an, wechselt in das
+freigegebene Arbeitsverzeichnis und startet darin die ausgewählte lokal
+installierte Agenten-CLI. Roundtable eröffnet keinen separaten API-Dialog.
+
 ### FR-SESS-002: Agent pro Session
 
 Jede Session speichert ihren eigenen Agententyp und ihre eigene
 Agentenkonfiguration. Gleichzeitig dürfen mehrere Sessions desselben oder
 unterschiedlicher Agenten laufen.
+
+Jede laufende Session besitzt genau einen nativen CLI-Prozess als
+Gesprächsinstanz. Alle Messenger-Eingaben und lokalen Eingaben erreichen diesen
+Prozess.
 
 ### FR-SESS-003: Session-Liste
 
@@ -124,7 +133,7 @@ Verfügbare Aktionen:
 - Benachrichtigungsmodus ändern,
 - stummschalten,
 - Status aktualisieren,
-- Terminalansicht öffnen,
+- CLI-Snapshot öffnen,
 - rohe oder vollständige Ausgabe abrufen,
 - Verlauf anzeigen,
 - Enter, Escape, Tab und Pfeiltasten senden,
@@ -156,13 +165,19 @@ Unterstützte kanonische Zustände:
 - `disconnected`,
 - `unknown`.
 
-Agent-Adapter können Rohzustände liefern. Der Core normalisiert sie auf dieses
-Statusmodell und speichert zusätzlich Evidenz und Zeitpunkt.
+CLI-Definitionen und Output-Erkenner können Rohzustände liefern. Der Core
+normalisiert sie auf dieses Statusmodell und speichert zusätzlich Evidenz und
+Zeitpunkt. Der Status darf den Tunnel nicht blockieren.
 
 ### FR-SESS-006: Default-Session
 
 Pro Benutzer und Transportkontext darf höchstens eine Default-Session gelten.
 Sie ist ausschließlich das Standardziel freier Nachrichten.
+
+Wird die erste Session eines Benutzer-/Transportkontexts erfolgreich erstellt
+und existiert noch kein Default, setzt Roundtable diese Session automatisch als
+Default. Später erstellte Sessions verändern den Default nicht. Der Benutzer
+kann ihn jederzeit manuell auf eine andere Session setzen.
 
 Eine Default-Session muss erreichbar und für den Benutzer zugänglich sein.
 Wird sie gestoppt, gelöscht oder unzugänglich, wird die Default-Zuweisung
@@ -182,7 +197,12 @@ Arbeitsverzeichnis und Agentenzuordnung.
 
 Der Benutzer kann eine von Roundtable verwaltete Session lokal im Terminal
 öffnen oder attachen. Telegram und Terminal greifen auf dieselbe laufende
-Agenteninstanz zu.
+Agenteninstanz und denselben nativen Chatverlauf zu.
+
+Eine über Telegram gesendete Nachricht muss nach erfolgreicher Zustellung in
+der lokal geöffneten CLI-Session sichtbar sein. Eine lokale Eingabe muss vom
+Roundtable-Outputpfad erkannt und entsprechend dem Abonnement in die zentrale
+Inbox geleitet werden.
 
 ### FR-SESS-009: Startaufgabe
 
@@ -191,6 +211,16 @@ erfolgreich gestartet und eingabebereit ist. Fehlgeschlagener Start und
 fehlgeschlagene Aufgabenzustellung werden getrennt protokolliert.
 
 ## Nachrichtenrouting
+
+### FR-ROUTE-000: Tunnel-Invariante
+
+Roundtable führt keinen eigenen Agentenkontext. Jede zustellbare
+Benutzernachricht wird in die echte CLI-Session geschrieben. Jede
+Agentennachricht stammt aus der Ausgabe dieser CLI-Session.
+
+Agenten-APIs, Hooks und strukturierte Ereignisse dürfen nur als optionale
+Hinweise für Status, Antwortgrenzen oder Freigaben dienen. Sie sind nicht der
+primäre Nachrichtenpfad.
 
 ### FR-ROUTE-001: Reply-Routing
 
@@ -216,10 +246,13 @@ Die Zielauflösung erfolgt in dieser Reihenfolge:
 1. explizite Reply-Zuordnung,
 2. explizites Session-Präfix oder ausgewähltes Sessionziel,
 3. Default-Session,
-4. interaktive Session-Auswahl.
+4. interaktive Session-Auswahl, falls kein gültiger Default existiert.
 
 Eine vorhandene Reply-Zuordnung darf nicht durch die Default-Session
 überschrieben werden.
+
+Das Erstellen einer zweiten oder späteren Session darf eine bestehende
+Default-Zuweisung niemals automatisch verändern.
 
 ### FR-ROUTE-003: Keine geratenen Zustellungen
 
@@ -242,8 +275,8 @@ entfernt, sofern die Benutzeroberfläche dies klar anzeigt.
 ### FR-ROUTE-005: Inhaltstreue
 
 Benutzereingaben werden standardmäßig exakt als Text plus die konfigurierte
-Abschlusstaste weitergereicht. Roundtable korrigiert, übersetzt oder erweitert
-die Eingabe nicht.
+Abschlusstaste in die native CLI-Session geschrieben. Roundtable korrigiert,
+übersetzt oder erweitert die Eingabe nicht.
 
 ### FR-ROUTE-006: Idempotenz
 
@@ -278,6 +311,11 @@ Eingabe semantisch verarbeitet hat.
 Roundtable erfasst den fortlaufenden Rohdatenstrom und, soweit verfügbar, den
 aktuellen Terminalbildschirm. Beide Darstellungen haben unterschiedliche
 Zwecke und dürfen nicht verwechselt werden.
+
+Für tmux verwendet Roundtable einen kontinuierlichen Outputpfad, beispielsweise
+`pipe-pane`, und einen Bildschirm-Snapshot über `capture-pane`. Der
+kontinuierliche Stream bewahrt Inhalt; der Snapshot hilft bei Vollbild-TUIs,
+Approvals und Wiederverbindung.
 
 ### FR-OUT-002: Transportaufbereitung
 
@@ -332,7 +370,7 @@ Unabhängig vom Modus bleibt der lokale Verlauf abrufbar.
 
 ### FR-INT-001: Rückfragen
 
-Erkennt ein Agent-Adapter eine Rückfrage, sendet Roundtable sie als neue,
+Erkennt der Output-Erkenner eine Rückfrage, sendet Roundtable sie als neue,
 routbare Nachricht. Antwortoptionen können als Buttons dargestellt werden,
 wenn ihre Terminalwirkung eindeutig ist.
 
@@ -363,14 +401,15 @@ keine zweite Eingabe.
 
 Vor einer Button-Aktion prüft Roundtable, ob Session, Prompt und erwarteter
 Terminalzustand noch zusammenpassen. Kann dies nicht bestätigt werden, wird
-nichts gesendet und eine aktuelle Terminalansicht angeboten.
+nichts gesendet und ein aktueller CLI-Snapshot angeboten.
 
-## Terminalsteuerung
+## Direkter Sessionzugriff und Steuerung
 
 ### FR-TERM-001: Bildschirmansicht
 
 Der Benutzer kann den aktuellen Terminalbildschirm als formatierten Text
-abrufen. Optional kann später ein Bild erzeugt werden.
+abrufen. Optional kann später ein Bild erzeugt werden. Dies ist eine Diagnose-
+und Komfortfunktion; primäre Oberfläche bleibt der gemeinsame Messenger-Chat.
 
 ### FR-TERM-002: Grundtasten
 
@@ -395,6 +434,17 @@ Roundtable Text ohne Enter einfügen oder ausschließlich eine Taste senden.
 Wenn der Benutzer gleichzeitig lokal und über Telegram schreibt, serialisiert
 Roundtable nur seine eigenen Eingaben. Die UI weist auf eine aktive lokale
 Verbindung hin, sofern das Runtime-Backend sie erkennen kann.
+
+Lokale Eingaben dürfen nicht zu einem getrennten Verlauf führen. Roundtable
+beobachtet weiterhin dieselbe CLI-Ausgabe und leitet daraus entstehende
+Agentenantworten in die Inbox.
+
+### FR-TERM-005: Nativer Verlauf
+
+Roundtable konfiguriert eine ausreichend große tmux-History und speichert den
+Raw Output separat. Lokales Attach zeigt den echten nativen CLI-Zustand; der
+vollständige lokale Raw-Verlauf bleibt auch dann abrufbar, wenn die sichtbare
+tmux-Scrollback-Grenze erreicht wurde.
 
 ## Verlauf und Audit
 
@@ -440,7 +490,7 @@ Je nach Fehler werden sichere Aktionen angeboten:
 
 - erneut versuchen,
 - Status neu laden,
-- Terminal anzeigen,
+- CLI-Snapshot anzeigen,
 - Runtime wiederverbinden,
 - Agent fortsetzen,
 - Session neu starten,

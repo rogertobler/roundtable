@@ -1,11 +1,12 @@
 # Roundtable
 
-Roundtable ist eine lokale, plattformübergreifende Steuerungs- und
-Kommunikationsebene für mehrere gleichzeitig laufende Terminal-Agenten.
+Roundtable ist ein lokaler, plattformübergreifender Multi-Agent-Chat-Router.
+Ein gemeinsamer Messenger-Chat steuert mehrere gleichzeitig laufende
+AI-Agenten in echten CLI-Sessions.
 
 Telegram ist der erste Kommunikationskanal. Claude Code und OpenAI Codex sind
 die ersten unterstützten Agenten. Jede Session besitzt ihren eigenen Agenten,
-ihr eigenes Modell, Projekt und Terminal.
+ihr eigenes Modell, Projekt und eine dauerhafte tmux-Session.
 
 ```text
 Reply auf eine Agentennachricht -> Ursprungssession
@@ -15,6 +16,11 @@ Freie Nachricht                -> Default-Session
 Dadurch können beispielsweise eine Claude-Session und eine Codex-Session
 gleichzeitig über denselben privaten Telegram-Chat bedient werden, ohne
 Nachrichten manuell einer Session zuordnen zu müssen.
+
+Roundtable führt keinen eigenen Agentendialog. Es liest Ausgaben aus der echten
+CLI-Session und schreibt Benutzerantworten in genau diese Session zurück. Wer
+die tmux-Session lokal öffnet, sieht denselben nativen Chatverlauf und kann dort
+nahtlos weiterschreiben.
 
 ## Status
 
@@ -40,10 +46,15 @@ Besonders relevant:
 
 - Agent und Modell werden pro Session festgelegt.
 - Claude-, Codex- und weitere Agentensessions können parallel laufen.
+- Der Messenger-Chat ist die Roundtable-Benutzeroberfläche.
+- Die native CLI-Session ist die einzige laufende Agentenkonversation.
+- Roundtable ist ein inhaltstreuer Tunnel zwischen Chat und CLI-Session.
 - Replies werden über persistente Nachrichten-IDs zur Ursprungssession
   geroutet.
 - Freie Nachrichten gehen ausschließlich an eine explizite Default-Session.
 - Roundtable schreibt Nachrichten und Freigaben nicht um.
+- Agenten-APIs, Hooks und strukturierte Events dürfen höchstens optionale
+  Erkennungshilfen sein und bilden keinen zweiten Nachrichtenpfad.
 - Linux, macOS und Windows sind Zielplattformen.
 - Der Grundbetrieb bleibt local-first und benötigt keinen Roundtable-Cloud-
   Dienst.

@@ -38,8 +38,10 @@ Inhalt oder Gesprächston werden nicht zur Zielbestimmung interpretiert.
 
 Status: verbindlich
 
-Es gibt eine explizite Default-Session für freie Nachrichten. Roundtable ändert
-sie nicht aufgrund letzter Aktivität oder zuletzt empfangener Agentenausgabe.
+Es gibt eine Default-Session für freie Nachrichten. Die erste erfolgreich
+erstellte Session wird automatisch Default, wenn noch keine Default-Session
+existiert. Spätere Sessionstarts ändern sie nicht. Danach kann nur der Benutzer
+den Default manuell wechseln.
 
 Priorität:
 
@@ -81,12 +83,16 @@ Status: verbindlich
 Telegram-spezifische IDs werden in Transporttabellen gekapselt. Der Core
 arbeitet mit internen Benutzern, Sessions, Nachrichten und Interaktionen.
 
-### D-009: tmux ist Backend, nicht Gesamtabstraktion
+### D-009: Echte CLI-Session als Tunnelziel
 
 Status: verbindlich
 
-tmux ist die erste Linux-/macOS-Runtime, aber nicht Teil des
-Roundtable-Domänenmodells. Windows benötigt ConPTY oder WSL.
+Jede Roundtable-Session tunnelt zu einer echten nativen Agenten-CLI. Unter
+Linux, macOS und Windows via WSL wird sie in tmux gehalten. Roundtable führt
+keinen eigenen Agenten- oder API-Chat.
+
+Telegram-Eingaben müssen im lokal attachten CLI-Verlauf sichtbar sein. Lokale
+und mobile Bedienung verwenden denselben Agentenprozess.
 
 ### D-010: Plattformen
 
@@ -108,6 +114,7 @@ Status: vorgeschlagen
 
 Wo tmux nicht eingesetzt wird, hält ein separater Session-Host-Prozess das PTY.
 So kann der Router neu starten, ohne die Agenteninstanz zwangsläufig zu beenden.
+Dieser Fall betrifft vor allem die spätere native Windows-Unterstützung.
 
 ### D-013: Go als Implementierungssprache
 
@@ -136,7 +143,7 @@ meldet den Fehler.
 
 Status: verbindlich
 
-Roundtable startet als öffentliches persönliches Open-Source-Repository unter
+Roundtable startet als öffentliches persönliches Repository unter
 `rogertobler/roundtable`.
 
 Das Repository gehört nicht zur GitHub-Organisation `inscribe-GmbH`, solange
@@ -146,6 +153,31 @@ Firmenprodukt von InScribe wird.
 Falls das Projekt wächst, kann es später in eine eigene Roundtable-Organisation
 übertragen werden. Projektverlauf, Issues, Pull Requests, Stars und
 Weiterleitungen sollen bei einem solchen Transfer erhalten bleiben.
+
+### D-017: Messenger ist die Roundtable-Oberfläche
+
+Status: verbindlich
+
+Roundtable ist kein Terminalprodukt. Der Benutzer arbeitet primär in einem
+gemeinsamen Messenger-Chat, der Nachrichten mehrerer Agenten-CLIs
+zusammenführt. CLI-Snapshots und Grundtasten sind Diagnose- und
+Fallbackfunktionen.
+
+### D-018: Hooks sind nur Sensoren
+
+Status: verbindlich
+
+Agenten-Hooks, strukturierte Events oder APIs dürfen Hinweise auf Status,
+Turn-Ende und Approvals liefern. Sie dürfen weder Benutzertext an der nativen
+CLI vorbeiführen noch einen zweiten Agentenverlauf erzeugen.
+
+### D-019: Initialer Default
+
+Status: verbindlich
+
+Die erste erfolgreich erstellte Session wird automatisch Default, wenn für den
+Benutzer und Transportkontext noch keiner existiert. Jede Reply ignoriert den
+Default und geht an die Session der beantworteten Nachricht.
 
 ## Noch offene Produktfragen
 
@@ -216,16 +248,19 @@ Sessionentwurf umwandeln und vor Start bestätigen.
 
 ## Noch offene technische Fragen
 
-### OQ-T-001: Go-PTY-Bibliotheken
+### OQ-T-001: Native Windows-Sessionbibliothek
 
 Im Spike prüfen:
 
-- Unix PTY,
 - ConPTY,
-- Terminalscreen-Emulation,
 - UTF-8 und Windows-Codepages,
 - Resize und Signalverhalten,
+- lokaler Attach-Client,
+- Persistenz über Core-Neustarts,
 - Cross-Compilation.
+
+Für Linux/macOS wird zunächst tmux gesteuert; dort ist keine eigene
+PTY-Implementierung Voraussetzung.
 
 ### OQ-T-002: tmux Output Capture
 
@@ -236,7 +271,9 @@ Festzulegen:
 - Rotation,
 - Cursorpersistenz,
 - Verhalten bei lokalem Attach,
-- Rekonstruktion stabiler Ausgaben.
+- Rekonstruktion stabiler Ausgaben,
+- ausreichend große tmux-History,
+- literal Buffer/Paste für Messengertext.
 
 ### OQ-T-003: Telegram Update-Modus
 
@@ -248,14 +285,15 @@ Long Polling; Webhook optional für Serverbetrieb.
 
 Für jede unterstützte Claude-/Codex-Version prüfen:
 
-- verfügbare Hooks oder strukturierte Events,
+- verfügbare optionale Hooks oder strukturierte Hinweise,
 - Stabilität der TUI,
 - Approval-Optionen,
 - Resume-Verhalten,
 - Modellermittlung,
 - Exit- und Abschlusssemantik.
 
-Der Adapter muss bei unbekannter Version sicher degradieren.
+Die CLI-Definition muss bei unbekannter Version sicher auf reines
+tmux-Monitoring degradieren. Der Nachrichtenpfad bleibt immer tmux.
 
 ### OQ-T-005: Terminalparser
 
@@ -334,7 +372,7 @@ werden:
 3. SQLite-Treiber und Migrationen,
 4. tmux-Befehls- und Outputstrategie,
 5. Terminalparser,
-6. interner Adaptervertrag,
+6. Verträge für Transport, CLI-Definition und Session-Tunnel,
 7. Dienst- und Datenpfade,
 8. Secret-Store-Fallback,
 9. Testfixtures für Claude und Codex,
