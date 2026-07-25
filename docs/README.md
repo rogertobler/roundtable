@@ -94,6 +94,8 @@ Freie Nachricht ohne Reply
   getroffene Entscheidungen und noch offene Detailfragen
 - [10-existing-solutions.md](10-existing-solutions.md): bestehende ähnliche
   Projekte, technische Referenzen und Abgrenzung
+- [11-ai-review-brief.md](11-ai-review-brief.md): eigenständige, kompakte
+  Funktionsbeschreibung für Reviews durch andere AI-Systeme
 
 ## Terminologie
 
