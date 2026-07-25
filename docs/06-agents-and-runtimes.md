@@ -57,6 +57,12 @@ tmux -V
 Roundtable übernimmt bestehende CLI-Anmeldungen und Konfigurationen. Tokens
 werden nicht in die Roundtable-Projektkonfiguration kopiert.
 
+Im Standardbetrieb laufen Roundtable, tmux und Agenten-CLI host-nativ im
+Benutzerkontext. Die Session öffnet denselben freigegebenen Projektpfad oder
+Git-Worktree, den der Benutzer auch direkt bearbeitet. Es gibt keine
+Roundtable-spezifische Pflichtkopie der Codebasis und keine
+Container-Runtime.
+
 ## Agent Definition
 
 Eine Agent Definition hält nur das Wissen, das zum Betrieb der CLI im Tunnel

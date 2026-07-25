@@ -64,6 +64,10 @@ Codex und Claude Code sind die ersten Agenten.
     Lokales Terminal und Messenger verwenden denselben Prozess, wechseln sich
     beim Schreiben aber kontrolliert ab. Unklare Teilzustellungen werden nie
     automatisch wiederholt.
+15. **Dieselbe Codebasis bleibt direkt nutzbar.** Roundtable startet die
+    Agenten host-nativ mit den freigegebenen Projektpfaden, Git-Worktrees,
+    Credentials und Werkzeugen des Benutzers. Docker ist kein
+    Roundtable-Installations- oder Runtime-Modell.
 
 ## Beispiel
 
@@ -117,6 +121,9 @@ Freie Nachricht ohne Reply
   offenen Risiken und vergleichbarem Antwortformat
 - [history/README.md](history/README.md): Regeln für künftige datierte
   Änderungen an der Baseline
+- [sessions/README.md](sessions/README.md): chronologische Arbeitsberichte mit
+  Diskussionen, Begründungen, Änderungen, Verifikation und Übergabe an die
+  nächste Entwicklungs-Session
 
 ## Terminologie
 
@@ -152,3 +159,7 @@ Produktumfang gestrichen.
 aktuellen Entscheidungsstand. Künftige Änderungen an der Baseline erhalten
 einen datierten Eintrag unter [history](history/README.md); die normativen
 Dokumente werden gleichzeitig auf den neuen gültigen Stand gebracht.
+
+Arbeitsverlauf und Entscheidungsdiskussionen werden getrennt unter
+[sessions](sessions/README.md) dokumentiert. Diese Berichte dürfen historische
+Zwischenstände enthalten und sind deshalb nicht normativ.

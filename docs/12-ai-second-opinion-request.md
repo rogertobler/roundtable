@@ -66,6 +66,11 @@ Roundtable ist:
 - eine gemeinsame Inbox für mehrere Agent-Sessions,
 - eine lokale Routing-, Zustell- und Audit-Schicht.
 
+Roundtable arbeitet im Standardfall host-nativ auf derselben Codebasis,
+denselben Git-Worktrees und mit denselben lokal installierten Agenten-CLIs,
+Credentials und Werkzeugen wie der Benutzer am Rechner. Docker ist kein
+Roundtable-Installations- oder Runtime-Modell.
+
 Roundtable ist nicht:
 
 - ein eigener AI-Agent,
@@ -75,6 +80,7 @@ Roundtable ist nicht:
 - ein Webterminal,
 - eine zweite Quelle für den Gesprächskontext,
 - eine Cloud, durch die Quellcode oder Agentenkontext laufen müssen.
+- ein verpflichtender Container oder eine getrennte Roundtable-Codekopie.
 
 ## Nicht verhandelbare Produktentscheidungen
 
@@ -639,8 +645,8 @@ Wichtige Grenze:
 Eine Pfad-Allowlist im Roundtable-Core beschränkt die von Roundtable
 ausgewählten Arbeitsverzeichnisse. Sie kann allein nicht garantieren, dass ein
 Agentenprozess später nicht auf andere Pfade zugreift. Starke Grenzen benötigen
-zusätzlich agenteneigene Sandbox-Modi, Betriebssystemrechte, Container oder
-andere Isolation.
+zusätzlich agenteneigene Sandbox-Modi, Betriebssystemrechte oder andere
+hostseitige Isolation.
 
 ## Plattformstrategie
 

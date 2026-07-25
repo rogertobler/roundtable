@@ -137,7 +137,7 @@ Berechtigungsprofil:
 
 Die genaue Wirkung wird in der Session-Zusammenfassung angezeigt. Das Profil
 wählt dokumentierte agenteneigene Berechtigungsoptionen und, soweit
-konfiguriert, Betriebssystem- oder Containergrenzen. Roundtable darf keine
+konfiguriert, Betriebssystemgrenzen. Roundtable darf keine
 stärkere Isolation versprechen, als diese Mechanismen tatsächlich erzwingen.
 
 ### 7. Startaufgabe
@@ -191,6 +191,10 @@ Session.
 Im Hintergrund wurde eine tmux-Session erstellt und darin die gewählte
 Agenten-CLI gestartet. Alle folgenden Telegram-Eingaben erscheinen auch in
 dieser nativen CLI.
+
+Der Projekt-/Worktree-Pfad ist derselbe host-native Pfad, den der Benutzer
+direkt am Rechner öffnen kann. Die Oberfläche verwendet keinen
+Container und keine unsichtbare Roundtable-Codekopie.
 
 Ist dies die erste erfolgreich erstellte Session und existiert noch kein
 Default, zeigt die Bestätigung zusätzlich:

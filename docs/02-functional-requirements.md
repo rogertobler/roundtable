@@ -70,6 +70,19 @@ Roundtable kann neue Branches und Worktrees für parallele Sessions erstellen.
 Name und Zielpfad werden vor der Erstellung angezeigt. Fehler hinterlassen
 keine fälschlich als aktiv markierte Session.
 
+### FR-PROJ-005: Host-native Workspace-Parität
+
+Im Standardbetrieb verwendet Roundtable exakt den freigegebenen lokalen
+Projektpfad oder Git-Worktree. Dieselbe Codebasis muss sowohl über eine von
+Roundtable gestartete Session als auch durch direktes Arbeiten am Rechner
+nutzbar sein.
+
+Roundtable startet Agenten mit derselben normalen Benutzeridentität und den
+lokal verfügbaren Werkzeugen und Credentials, soweit das gewählte
+Berechtigungsprofil keine ausdrücklich sichtbare Einschränkung vorsieht.
+Docker, ein Container-Image oder eine separate Projektkopie sind nicht Teil
+des Roundtable-Betriebsmodells.
+
 ## Sessions
 
 ### FR-SESS-001: Session erstellen

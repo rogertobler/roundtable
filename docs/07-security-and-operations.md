@@ -75,7 +75,7 @@ Gegenmaßnahme:
 - kritische Aktionen nicht allein aufgrund eines Agententexts freigeben,
 - originale Aktion und Zielkontext anzeigen,
 - Produktions- und Secretzugriffe standardmäßig ausschließen,
-- optional OS-Sandbox oder Container.
+- optional agenteneigene oder betriebssystemseitige Sandbox.
 
 ### Schädliche oder fehlerhafte CLI-Definition
 
@@ -168,7 +168,7 @@ Sicherheitsgrenze.
 
 Roundtable kann als Tunnel nicht jeden internen Tool-Aufruf des Agenten selbst
 blockieren. Die tatsächliche Laufzeitgrenze wird durch agenteneigene
-Approval-/Sandboxmodi, Betriebssystemrechte, Container und Projektpfade
+Approval-/Sandboxmodi, Betriebssystemrechte und Projektpfade
 erzwungen. Die Roundtable-UI darf keine stärkere Garantie behaupten.
 
 ## Berechtigungsprofile
@@ -187,7 +187,7 @@ Regeln:
 - Shell- und Toolfreigaben nach Policy einschränken.
 
 Ein Agent kann möglicherweise trotz Prompt versehentlich schreiben. Für starke
-Garantien ist eine OS- oder Container-Sandbox nötig.
+Garantien ist eine agenteneigene oder betriebssystemseitige Sandbox nötig.
 
 ### Standard
 
@@ -201,7 +201,7 @@ Regeln:
 - normale Tests und lokale Builds möglich,
 - agenteneigener Approvalmodus verlangt Freigaben für riskante Aktionen,
 - Zugriffe außerhalb des Projekts werden durch agenteneigene Sandbox,
-  Betriebssystemrechte oder Container blockiert beziehungsweise bestätigt.
+  Betriebssystemrechte blockiert beziehungsweise bestätigt.
 
 ### Vertrauenswürdig
 
@@ -353,11 +353,16 @@ roundtable start
 - später signierter nativer Installer mit ConPTY Session Host,
 - Credential Manager/DPAPI für native Roundtable-Secrets.
 
-### Container
+### Host-native Laufzeit
 
-Docker kann für VPS-Nutzer angeboten werden, ist aber nicht der einzige
-Installationsweg. Interaktive PTYs, Projekt-Mounts, SSH-Schlüssel und
-Docker-outside-of-Docker müssen ausdrücklich dokumentiert und begrenzt werden.
+Roundtable bietet kein Docker-Image als Installations- oder Runtime-Modell an.
+Der Betrieb verwendet dieselbe host-native Codebasis, Agenteninstallation,
+Authentifizierung und Entwicklungsumgebung wie die direkte Arbeit am Rechner.
+
+Isolation wird über die vorhandenen Sandbox-/Approvalfunktionen der
+Agenten-CLI, Betriebssystemrechte und getrennte Git-Worktrees hergestellt.
+Roundtable kann innerhalb einer vom Benutzer selbst verwalteten VM oder WSL
+laufen; innerhalb dieser Umgebung bleibt der Betrieb wiederum host-nativ.
 
 ## Diagnose
 

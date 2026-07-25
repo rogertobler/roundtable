@@ -75,6 +75,9 @@ tmux-Session. Es gibt keinen separaten „Telegram-Agenten“.
 8. Reply-Routing hat immer Vorrang vor Default-Routing.
 9. Ohne eindeutige Zielsession wird nichts geraten.
 10. Spätere Backends müssen dieselbe sichtbare Tunnel-Semantik erfüllen.
+11. Standard-Sessions arbeiten host-nativ auf derselben freigegebenen
+    Codebasis und mit denselben lokalen Werkzeugen wie direkte Rechnerarbeit.
+    Docker ist keine Roundtable-Runtime.
 
 ## Prozessmodell
 
@@ -110,6 +113,10 @@ Pro Roundtable-Session existiert im ersten Backend:
 
 Die CLI verwendet ihre bereits vorhandene lokale Authentifizierung,
 Konfiguration, MCP-Server, Plugins, Skills und Berechtigungen.
+
+Das Arbeitsverzeichnis ist der reale freigegebene Hostpfad oder Git-Worktree.
+Lokaler Editor, direkt gestartete CLI und Roundtable-Session sehen dieselben
+Dateien und Git-Änderungen ohne Synchronisationsschicht.
 
 ### Lokaler Zugriff
 

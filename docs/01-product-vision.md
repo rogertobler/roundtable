@@ -40,6 +40,12 @@ macOS und zunächst auch unter Windows via WSL wird sie in tmux gehalten.
 Agentenausgaben werden aus dieser Session in den Messenger geleitet;
 Benutzernachrichten werden literal in dieselbe Session zurückgeschrieben.
 
+Roundtable arbeitet dabei standardmäßig host-nativ. Die Session verwendet
+dieselbe Codebasis, dieselben Git-Worktrees, dieselben lokal installierten
+Werkzeuge und dieselbe Agentenauthentifizierung, die der Benutzer auch bei
+direkter Arbeit am Rechner verwendet. Es gibt keine separate
+Roundtable-Codekopie in einem Pflichtcontainer.
+
 Öffnet der Benutzer die Session lokal mit tmux, sieht er den nativen
 Claude-/Codex-Chatverlauf einschließlich der über Telegram gesendeten
 Nachrichten. Er kann lokal oder über den Messenger im selben Kontext
@@ -183,6 +189,12 @@ Roundtable läuft beim Benutzer oder auf dessen Server. Die lokale Datenbank ist
 die maßgebliche Quelle für Sessions, Routing und Auditdaten. Ein optionaler
 Cloud-Dienst darf später Komfort bieten, aber keine Voraussetzung für den
 Grundbetrieb sein.
+
+Local-first bedeutet auch Workspace-Parität: Roundtable und eine direkt
+geöffnete lokale CLI arbeiten auf denselben freigegebenen Dateien. Docker ist
+kein Roundtable-Installations- oder Runtime-Modell. Isolation erfolgt, soweit
+gewünscht, über agenteneigene Sandboxfunktionen und Betriebssystemrechte, ohne
+eine getrennte Roundtable-Codekopie einzuführen.
 
 ### Inhaltstreu
 

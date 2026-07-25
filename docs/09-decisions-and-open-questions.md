@@ -234,6 +234,20 @@ Jede Runtime besitzt feste, gespeicherte Terminalmaße. Lokales Attach darf sie
 nicht still verändern. Der konkrete Standardwert wird im technischen Spike
 festgelegt.
 
+### D-025: Host-native Workspace-Parität
+
+Status: verbindlich
+
+Roundtable startet Agenten standardmäßig host-nativ im normalen
+Benutzerkontext. Roundtable-Sessions und direkte lokale Arbeit verwenden
+dieselbe freigegebene Codebasis, dieselben Git-Worktrees, lokal installierten
+Agenten-CLIs, Credentials und Entwicklungswerkzeuge.
+
+Docker ist kein Roundtable-Installations- oder Runtime-Modell. Isolation wird
+über agenteneigene Sandboxfunktionen, Betriebssystemrechte und getrennte
+Worktrees umgesetzt. Eine vom Benutzer verwaltete VM oder WSL gilt als
+Hostumgebung der dort laufenden Roundtable-Installation.
+
 ## Noch offene Produktfragen
 
 ### OQ-P-001: Bestätigung erfolgreicher freier Nachrichten

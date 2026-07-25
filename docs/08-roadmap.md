@@ -84,6 +84,7 @@ Umfang:
 - sicheres Einbenutzer-Pairing,
 - SQLite-Migrationen,
 - Projekt-Allowlist,
+- host-native Nutzung derselben lokalen Codebasis und Worktrees,
 - Claude-Code-CLI-Definition,
 - Codex-CLI-Definition,
 - Agent und Modell pro Session,
@@ -127,6 +128,8 @@ Abnahme:
 - Neustart des Core beendet tmux-Sessions nicht.
 - Nicht autorisierte Telegram-Nutzer sehen keine Metadaten.
 - Projekte außerhalb der Allowlist können nicht gestartet werden.
+- Direktes lokales Arbeiten und Roundtable verwenden nachweislich dieselben
+  Projektdateien und Git-Änderungen.
 - Lange Ausgaben bleiben vollständig abrufbar.
 
 ## Phase 2: Robuste Inbox und Interaktionen

@@ -42,6 +42,7 @@ Besonders relevant:
 - [Agenten-CLIs und Session-Tunnel](docs/06-agents-and-runtimes.md)
 - [Roadmap](docs/08-roadmap.md)
 - [Entscheidungen und offene Fragen](docs/09-decisions-and-open-questions.md)
+- [Entwicklungs-Sessions](docs/sessions/README.md)
 
 ## Zentrale Prinzipien
 
@@ -49,6 +50,8 @@ Besonders relevant:
 - Claude-, Codex- und weitere Agentensessions können parallel laufen.
 - Der Messenger-Chat ist die Roundtable-Benutzeroberfläche.
 - Die native CLI-Session ist die einzige laufende Agentenkonversation.
+- Roundtable und die Agenten arbeiten host-nativ auf derselben Codebasis, mit
+  der der Benutzer auch direkt am Rechner arbeitet.
 - Roundtable ist ein inhaltstreuer Tunnel zwischen Chat und CLI-Session.
 - Replies werden über persistente Nachrichten-IDs zur Ursprungssession
   geroutet.
@@ -66,6 +69,7 @@ Besonders relevant:
 - Linux, macOS und Windows sind Zielplattformen.
 - Der Grundbetrieb bleibt local-first und benötigt keinen Roundtable-Cloud-
   Dienst.
+- Docker ist kein Roundtable-Installations- oder Runtime-Modell.
 
 ## Lizenz
 

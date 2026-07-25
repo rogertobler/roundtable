@@ -21,6 +21,11 @@ privaten Server. Roundtable macht einen privaten Telegram-Bot-Chat zur
 gemeinsamen Inbox und Steuerungsoberfläche für alle diese Sessions. Später soll
 derselbe Router auch WhatsApp und weitere Messenger bedienen.
 
+Der Standardbetrieb ist host-nativ. Roundtable und direktes lokales Arbeiten
+verwenden dieselbe Codebasis, dieselben Git-Worktrees, Agenteninstallationen,
+Credentials und Werkzeuge. Docker ist kein Roundtable-Installations- oder
+Runtime-Modell.
+
 Roundtable ist kein eigener KI-Agent, kein Agenten-SDK und kein
 Terminalprodukt. Es ist ausschließlich Chat-Router, Sessionverwaltung und
 bidirektionaler Tunnel.
@@ -314,7 +319,7 @@ angezeigt und niemals automatisch erneut gesendet.
 - Prompt- und Runtime-Prüfung vor Approval-Buttons,
 - keine geratenen Sessionziele,
 - agenteneigene Sandbox- und Approvalmodi,
-- optional OS-/Container-Sandbox für starke Schreibgrenzen,
+- optional betriebssystemseitige Sandbox für starke Schreibgrenzen,
 - vollständiges Audit kritischer Aktionen.
 
 ## Benachrichtigungen und Backpressure

@@ -24,3 +24,7 @@ Jeder Eintrag enthält:
 Die betroffenen normativen Dokumente werden im selben Commit aktualisiert.
 Dieses Verzeichnis erklärt, warum sich die Baseline geändert hat; es ersetzt
 sie nicht und hält keine alte Architektur als weiterhin gültige Variante fest.
+
+Ausführlichere Arbeitsprotokolle mit Diskussionen, verworfenen Alternativen,
+Recherchen und Übergaben liegen getrennt unter
+[`docs/sessions/`](../sessions/README.md).
