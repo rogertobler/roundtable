@@ -160,7 +160,9 @@ Der Router bestimmt für jede Benutzernachricht genau eine Session:
 ```text
 resolveTarget(message):
   if message is a reply:
-      return session mapped to replied message
+      if replied message has one valid accessible session mapping:
+          return mapped session
+      return RoutingError
 
   if message has an explicit session alias:
       return resolved session
@@ -170,6 +172,10 @@ resolveTarget(message):
 
   return NeedsExplicitSelection
 ```
+
+Eine vorhandene Reply wird niemals als freie Nachricht weiterverarbeitet. Ein
+fehlendes oder ungültiges Reply-Mapping endet mit `RoutingError` und darf nicht
+zum Default durchfallen.
 
 Beim ersten erfolgreichen Sessionstart eines Benutzer-/Transportkontexts:
 
@@ -384,7 +390,7 @@ sequenceDiagram
     B->>A: CLI im Arbeitsverzeichnis starten
     B-->>C: Runtime-ID und Outputpfad
     C->>C: Session speichern
-    C->>C: falls erster Start, als Default setzen
+    C->>C: falls erste erfolgreiche Session ohne Default, als Default setzen
     C-->>T: routbare Startbestätigung
 ```
 

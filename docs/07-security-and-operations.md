@@ -200,7 +200,8 @@ Regeln:
 - Dateiänderungen im Projekt erlaubt,
 - normale Tests und lokale Builds möglich,
 - agenteneigener Approvalmodus verlangt Freigaben für riskante Aktionen,
-- Zugriffe außerhalb des Projekts blockiert oder bestätigt.
+- Zugriffe außerhalb des Projekts werden durch agenteneigene Sandbox,
+  Betriebssystemrechte oder Container blockiert beziehungsweise bestätigt.
 
 ### Vertrauenswürdig
 
@@ -211,8 +212,10 @@ Ziel:
 Regeln:
 
 - nur für explizit ausgewählte Projekte,
-- erlaubte Aktionsklassen werden einzeln konfiguriert,
+- erlaubte Aktionsklassen werden vor Sessionstart über dokumentierte Agenten-
+  oder Sandboxoptionen konfiguriert,
 - Produktionsaktionen bleiben standardmäßig ausgeschlossen,
+- Roundtable beantwortet auch in diesem Profil keinen sichtbaren Prompt selbst,
 - vollständiges Audit bleibt aktiv.
 
 ### Eingeschränkt
@@ -224,7 +227,8 @@ Ziel:
 Regeln:
 
 - relevante Agentenaktionen benötigen Bestätigung,
-- keine dauerhafte Freigabe ohne gesonderte Policyänderung,
+- Roundtable erzeugt keine Zustimmung und ändert keine Approval-Policy aus
+  einem Prompt heraus,
 - kurze Interaction-Ablaufzeiten.
 
 ## Approvals
@@ -235,7 +239,7 @@ Roundtable behandelt Approvals als Terminalinteraktionen:
 - Optionen und konkrete Tastenwirkung speichern,
 - Antwort genau einmal senden,
 - keine semantische Umdeutung,
-- keine automatische Zustimmung im Standard,
+- niemals eigenständig Zustimmung oder Ablehnung erzeugen,
 - veralteten Terminalzustand erkennen.
 
 Der Prompt stammt aus dem aktuellen CLI-Bild. Eine Benutzerentscheidung wird
@@ -243,10 +247,10 @@ als Text oder Tastenfolge über dieselbe tmux-Session zurückgesendet. Optionale
 Hooks dürfen Roundtable auf den Prompt aufmerksam machen, ihn aber nicht in
 einem zweiten Dialog beantworten.
 
-„Für diese Session erlauben“ darf nur angeboten werden, wenn entweder der Agent
-diese Option selbst anbietet oder Roundtable eine ausdrücklich dokumentierte
-Policyänderung vornimmt. Eine einzelne Taste darf nicht irreführend als
-dauerhafte Roundtable-Regel bezeichnet werden.
+„Für diese Session erlauben“ darf nur angeboten werden, wenn der sichtbare
+Agentenprompt diese Option selbst anbietet und die konkrete Tastenwirkung
+bekannt ist. Eine einzelne Taste darf nicht irreführend als dauerhafte
+Roundtable-Regel bezeichnet werden.
 
 ## Secret-Schutz
 
@@ -359,7 +363,7 @@ Docker-outside-of-Docker müssen ausdrücklich dokumentiert und begrenzt werden.
 - autorisierte Identitäten,
 - installierte Agenten und Versionen,
 - lokale Agentenauthentifizierung, soweit ohne Secretzugriff prüfbar,
-- verfügbare Runtime-Backends,
+- verfügbare Session Backends,
 - tmux oder ConPTY,
 - Projektpfade,
 - Git,

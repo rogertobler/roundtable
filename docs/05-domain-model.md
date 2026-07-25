@@ -95,7 +95,7 @@ AgentProfile
   defaultModel
   additionalArguments
   environmentReferences
-  adapterVersion
+  definitionVersion
   enabled
 ```
 
@@ -256,7 +256,7 @@ Arten:
 - Abschluss,
 - Fehler,
 - Datei,
-- Terminal-Snapshot,
+- CLI-Snapshot,
 - Systemereignis.
 
 Diese Nachrichten bilden nicht den maßgeblichen Agenten-Thread. Jede
@@ -473,15 +473,13 @@ stateDiagram-v2
     starting --> running
     starting --> error
     running --> interrupted
-    running --> completed
+    running --> stopped
     running --> error
     running --> disconnected
     interrupted --> running
     interrupted --> stopped
     disconnected --> running
     disconnected --> error
-    completed --> running: fortsetzen
-    completed --> stopped
     error --> starting: neu starten
     error --> stopped
     stopped --> starting: neu starten
@@ -492,14 +490,20 @@ stateDiagram-v2
 ### Interaktionszustand
 
 ```text
-none
+unknown
+ready
 working
 waiting_for_input
 waiting_for_approval
 ```
 
-Ein Adapter darf den Zustand nur mit Evidenz und Zeitstempel setzen. Veraltete
-Evidenz wird auf `unknown` zurückgestuft.
+Ein Output-Erkenner oder eine Agenten-Definition darf den Zustand nur mit
+Evidenz und Zeitstempel setzen. Veraltete Evidenz wird auf `unknown`
+zurückgestuft.
+
+Der Abschluss eines Agententurns ist ein `SessionEvent`, kein Ende des
+Sessionlebenszyklus. Bleibt die CLI aktiv, wird der aktuelle
+Interaktionszustand anschließend wieder `ready`.
 
 ## Invarianten
 

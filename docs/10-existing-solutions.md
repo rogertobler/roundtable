@@ -1,6 +1,6 @@
 # Bestehende Lösungen und Abgrenzung
 
-Stand der Recherche: Juli 2026
+Stand der Recherche: 25. Juli 2026
 
 Dieses Dokument ist keine vollständige Marktanalyse. Es hält Projekte fest, die
 für Architektur, Bedienung oder Positionierung von Roundtable relevant sind.
@@ -91,9 +91,6 @@ Zu prüfen:
 - ob Fork, Teilübernahme oder eigenständige Implementierung langfristig
   sinnvoller ist.
 
-Der Vorgänger <https://github.com/six-ddc/ccbot> bleibt als historische
-Referenz relevant.
-
 ## amux
 
 Link:
@@ -155,7 +152,9 @@ Relevanz:
 
 - offizieller Remotezugriff auf lokale Claude-Code-Sessions,
 - Bedienung über Browser oder mobile Oberfläche,
-- bestehender Claude-Kontext bleibt auf dem lokalen Rechner.
+- bestehender Claude-Prozess und Dateizugriff bleiben auf dem lokalen Rechner,
+- synchronisierter Transcript wird laut offizieller Dokumentation über
+  Anthropic-Dienste gespeichert.
 
 Abgrenzung:
 
@@ -188,9 +187,11 @@ Abgrenzung:
 
 Channels ist Claude-spezifisch und befindet sich in Research Preview.
 Roundtable verbindet mehrere Claude-, Codex- und weitere CLI-Sessions in einem
-gemeinsamen Chat. Channels und Hooks können als technische Referenz oder
-optionale Sensoren dienen, dürfen aber keinen zweiten Nachrichtenpfad neben der
-nativen CLI erzeugen.
+gemeinsamen Chat. Channels ist ein alternativer direkter Nachrichtenpfad und
+daher kein Bestandteil des Roundtable-Tunnels. Die Implementierung ist als
+Referenz für Pairing, Sender-Allowlist und Messenger-UX relevant. Davon
+getrennte Claude-Hooks können optional als Sensoren dienen, ohne Nachrichten an
+tmux vorbeizuführen.
 
 ## Schlussfolgerung
 

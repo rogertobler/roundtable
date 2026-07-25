@@ -1,9 +1,11 @@
 # Entscheidungen und offene Fragen
 
-Dieses Dokument hält Produkt- und Architekturentscheidungen fest. Der Status
-`verbindlich` bedeutet, dass Implementierungen davon nur nach einer
-dokumentierten neuen Entscheidung abweichen sollen. `Vorgeschlagen` bedeutet,
-dass ein technischer Spike die Entscheidung noch bestätigen muss.
+Dieses Dokument enthält ausschließlich den aktuell gültigen Produkt- und
+Architekturstand. Es bewahrt keine verworfenen Roundtable-Architekturen als
+normative Varianten auf. Der Status `verbindlich` bedeutet, dass
+Implementierungen davon nur nach einer dokumentierten neuen Entscheidung
+abweichen sollen. `Vorgeschlagen` bedeutet, dass ein technischer Spike die
+Entscheidung noch bestätigen muss.
 
 ## Getroffene Entscheidungen
 
@@ -34,7 +36,7 @@ Status: verbindlich
 Eine Reply wird anhand der externen ID der beantworteten Nachricht geroutet.
 Inhalt oder Gesprächston werden nicht zur Zielbestimmung interpretiert.
 
-### D-004: Default statt aktive Session
+### D-004: Default-Session für freie Nachrichten
 
 Status: verbindlich
 
@@ -46,7 +48,9 @@ den Default manuell wechseln.
 Priorität:
 
 ```text
-Reply > explizites Sessionziel > Default > Benutzerauswahl
+gültige Reply -> Ursprungssession
+ungültige Reply -> Fehler, kein Fallback
+keine Reply -> explizites Sessionziel > Default > Benutzerauswahl
 ```
 
 ### D-005: Inhaltstreues Routing
@@ -67,7 +71,9 @@ Der originale Approval-Prompt wird weitergegeben. Benutzerantworten werden
 inhaltstreu an dieselbe Session gesendet. Buttons sind deterministische
 Abkürzungen für sichtbare Text- oder Tasteneingaben.
 
-Roundtable erteilt standardmäßig keine automatische Freigabe.
+Roundtable erzeugt niemals eigenständig eine Freigabeentscheidung. Ein
+agenteneigener Berechtigungsmodus kann lediglich beeinflussen, ob die CLI
+überhaupt einen Prompt anzeigt.
 
 ### D-007: Telegram zuerst
 
@@ -103,10 +109,11 @@ als auch auf einem VPS funktionieren.
 
 ### D-011: Lokale Persistenz
 
-Status: vorgeschlagen
+Status: verbindlich
 
-SQLite speichert Konfiguration, Mapping, Idempotenz, Status, Audit und Outbox.
-Große Raw-Outputs liegen in referenzierten lokalen Dateien.
+SQLite läuft im WAL-Modus und speichert Konfiguration, Mapping, Idempotenz,
+Status, Audit und Outbox. Große Raw-Outputs liegen in referenzierten lokalen
+Dateien.
 
 ### D-012: Separate Session Hosts
 
@@ -171,29 +178,9 @@ Agenten-Hooks, strukturierte Events oder APIs dürfen Hinweise auf Status,
 Turn-Ende und Approvals liefern. Sie dürfen weder Benutzertext an der nativen
 CLI vorbeiführen noch einen zweiten Agentenverlauf erzeugen.
 
-### D-019: Initialer Default
-
-Status: verbindlich
-
-Die erste erfolgreich erstellte Session wird automatisch Default, wenn für den
-Benutzer und Transportkontext noch keiner existiert. Jede Reply ignoriert den
-Default und geht an die Session der beantworteten Nachricht.
-
 ## Noch offene Produktfragen
 
-### OQ-P-001: Default-Geltungsbereich
-
-Zu entscheiden:
-
-- eine Default-Session pro Benutzer insgesamt,
-- pro Transportidentität,
-- oder pro Chat.
-
-Aktuelle Empfehlung: pro Benutzer und Transport-/Chatkontext. Bei nur einem
-privaten Telegram-Chat verhält sich dies wie eine einzelne Default-Session,
-bleibt aber für spätere Kanäle korrekt.
-
-### OQ-P-002: Bestätigung erfolgreicher freier Nachrichten
+### OQ-P-001: Bestätigung erfolgreicher freier Nachrichten
 
 Soll jede freie Nachricht sichtbar mit dem Ziel bestätigt werden oder nur nach
 Default-Wechsel und bei Unsicherheit?
@@ -201,7 +188,7 @@ Default-Wechsel und bei Unsicherheit?
 Empfehlung: kompakte Bestätigung, die optional deaktiviert werden kann. Das
 senkt das Risiko unbemerkter Fehlannahmen.
 
-### OQ-P-003: Standard-Benachrichtigungsmodus
+### OQ-P-002: Standard-Benachrichtigungsmodus
 
 „Alles 1:1“ kann bei starkem Terminaloutput viele Nachrichten erzeugen.
 
@@ -212,7 +199,7 @@ Empfehlung:
 - Raw Output lokal vollständig halten,
 - pro Session abweichende Modi anbieten.
 
-### OQ-P-004: Sessionnamen und Aliase
+### OQ-P-003: Sessionnamen und Aliase
 
 Zu entscheiden:
 
@@ -223,28 +210,10 @@ Zu entscheiden:
 Empfehlung: veränderbarer Anzeigename plus eindeutiger kurzer Alias pro
 Benutzer.
 
-### OQ-P-005: Löschen versus Archivieren
+### OQ-P-004: Löschen versus Archivieren
 
 Empfehlung: „Stoppen“ und „Archivieren“ prominent; endgültiges Löschen nur in
 erweiterten Aktionen mit Retention- und Worktree-Hinweis.
-
-### OQ-P-006: Freie natürliche Session-Erstellung
-
-Beispiel:
-
-```text
-Neue Claude-Session mit Modell Opus, Projekt DumbleScore, Name Import Fix
-```
-
-Zu entscheiden ist, ob dies:
-
-- regelbasiert geparst,
-- mit einem lokalen/externen LLM interpretiert,
-- oder zunächst nur als Komfortsyntax mit anschließender Bestätigung angeboten
-  wird.
-
-Empfehlung: Menüs zuerst. Natürliche Eingabe später immer in einen sichtbaren
-Sessionentwurf umwandeln und vor Start bestätigen.
 
 ## Noch offene technische Fragen
 
@@ -345,7 +314,8 @@ Der Transportadapter muss Capability-Unterschiede sichtbar machen.
 
 ## Entscheidungsprozess
 
-Neue wesentliche Entscheidungen erhalten:
+Künftige wesentliche Entscheidungen erhalten einen datierten Eintrag unter
+`docs/history/` mit:
 
 ```text
 ID
@@ -358,9 +328,11 @@ Alternativen
 Konsequenzen
 ```
 
-Änderungen an verbindlichen Grundprinzipien müssen zusätzlich in
-`README.md`, Anforderungen und betroffenen Architekturkapiteln aktualisiert
-werden.
+Änderungen an verbindlichen Grundprinzipien müssen im selben Commit in
+`README.md`, Anforderungen und betroffenen Architekturkapiteln auf den neuen
+gültigen Stand gebracht werden. Die Historie erklärt die Änderung; alte
+Varianten bleiben nicht als konkurrierende Soll-Architektur in den normativen
+Dokumenten stehen.
 
 ## Erste technische Entscheidungen für den Spike
 

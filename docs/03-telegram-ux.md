@@ -135,9 +135,10 @@ Berechtigungsprofil:
 [Zurück]
 ```
 
-Die genaue Wirkung wird in der Session-Zusammenfassung angezeigt. Das
-Berechtigungsprofil ist eine Roundtable-Grenze und kann zusätzlich zum
-agenteneigenen Berechtigungsmodus wirken.
+Die genaue Wirkung wird in der Session-Zusammenfassung angezeigt. Das Profil
+wählt dokumentierte agenteneigene Berechtigungsoptionen und, soweit
+konfiguriert, Betriebssystem- oder Containergrenzen. Roundtable darf keine
+stärkere Isolation versprechen, als diese Mechanismen tatsächlich erzwingen.
 
 ### 7. Startaufgabe
 
@@ -247,7 +248,7 @@ Letzte Aktivität: vor 2 Minuten
 Inbox: alle stabilen Ausgaben
 Default: ja
 
-[Nachricht] [Terminal]
+[Nachricht] [CLI-Snapshot]
 [Unterbrechen] [Fortsetzen]
 [Inbox-Modus] [Default entfernen]
 [Neu starten] [Stoppen]
@@ -407,7 +408,7 @@ gesendet:
 Diese Freigabe ist nicht mehr aktuell.
 
 [Aktuellen CLI-Snapshot anzeigen]
-[Session öffnen]
+[Session-Details]
 ```
 
 Eine freie Textantwort auf den Freigabeprompt wird ebenfalls exakt an die

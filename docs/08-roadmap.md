@@ -24,7 +24,7 @@ Umfang:
 - Reply an die richtige Session senden,
 - Claude und Codex gleichzeitig betreiben,
 - typische Approval-Prompts beider Agenten aufzeichnen,
-- Router neu starten und tmux-Session wiederfinden.
+- Router neu starten und tmux-Session wiederfinden,
 - Telegram-Eingabe nach lokalem `tmux attach` im nativen CLI-Verlauf sehen,
 - lokale CLI-Eingabe beobachten und ihre Agentenantwort in Telegram sehen.
 
@@ -78,7 +78,8 @@ Umfang:
 - Session starten, unterbrechen und stoppen,
 - Abonnieren und Stummschalten,
 - einfache Statusmeldungen,
-- inhaltstreue Rückfragen und Freigaben,
+- Rückfragen und Approval-Prompts als normale inhaltstreue Ausgabe,
+- freie Antworten darauf über Reply-Routing 1:1 zurücktunneln,
 - persistente Nachrichten- und Sessionzuordnungen,
 - strukturierte Logs und `roundtable doctor`.
 

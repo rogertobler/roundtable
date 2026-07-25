@@ -28,7 +28,9 @@ Codex und Claude Code sind die ersten Agenten.
    stammt.
 3. **Die Default-Session gilt nur für freie Nachrichten.** Sie ist das Ziel
    einer Nachricht, die keine Telegram-Reply und kein explizites
-   Session-Präfix enthält.
+   Session-Präfix enthält. Die erste erfolgreich erstellte Session wird
+   initial Default. Weitere Sessionstarts ändern ihn nicht; nur der Benutzer
+   kann ihn wechseln.
 4. **Roundtable verändert keine Agenteninhalte.** Ein- und Ausgaben werden
    inhaltstreu weitergeleitet. Roundtable formuliert nicht um, beantwortet
    nichts selbst und trifft keine Entscheidungen für den Benutzer.
@@ -106,6 +108,11 @@ Freie Nachricht ohne Reply
   Projekte, technische Referenzen und Abgrenzung
 - [11-ai-review-brief.md](11-ai-review-brief.md): eigenständige, kompakte
   Funktionsbeschreibung für Reviews durch andere AI-Systeme
+- [12-ai-second-opinion-request.md](12-ai-second-opinion-request.md):
+  ausführlicher technischer Review-Auftrag mit festen Produktentscheidungen,
+  offenen Risiken und vergleichbarem Antwortformat
+- [history/README.md](history/README.md): Regeln für künftige datierte
+  Änderungen an der Baseline
 
 ## Terminologie
 
@@ -128,11 +135,16 @@ Freie Nachricht ohne Reply
 
 ## Status dieses Dokumentsatzes
 
-Die Dokumente beschreiben das gewünschte Zielprodukt. Die Roadmap legt fest, in
-welcher Reihenfolge dieses Ziel umgesetzt wird. Eine Funktion, die erst in einer
-späteren Phase steht, ist damit nicht aus dem Produktumfang gestrichen.
+Diese Dokumente bilden die aktuelle initiale Baseline. Sie enthalten keine
+absichtlich aufbewahrten früheren Roundtable-Architekturen. Widerspricht ein
+Review-Brief einer normativen Produktspezifikation, gelten `README.md` und die
+Kapitel `01` bis `09`.
 
-Abweichende Implementierungsentscheidungen sollen in
-`09-decisions-and-open-questions.md` festgehalten werden. Dadurch bleibt
-nachvollziehbar, ob eine Abweichung eine bewusste Entscheidung oder nur ein
-ungeklärtes Implementierungsdetail ist.
+Die Roadmap legt fest, in welcher Reihenfolge das Ziel umgesetzt wird. Eine
+Funktion, die erst in einer späteren Phase steht, ist damit nicht aus dem
+Produktumfang gestrichen.
+
+`09-decisions-and-open-questions.md` enthält ausschließlich den jeweils
+aktuellen Entscheidungsstand. Künftige Änderungen an der Baseline erhalten
+einen datierten Eintrag unter [history](history/README.md); die normativen
+Dokumente werden gleichzeitig auf den neuen gültigen Stand gebracht.

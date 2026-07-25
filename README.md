@@ -38,7 +38,7 @@ Besonders relevant:
 - [Funktionale Anforderungen](docs/02-functional-requirements.md)
 - [Telegram-Bedienkonzept](docs/03-telegram-ux.md)
 - [Technische Architektur](docs/04-architecture.md)
-- [Agenten und Terminal-Runtimes](docs/06-agents-and-runtimes.md)
+- [Agenten-CLIs und Session-Tunnel](docs/06-agents-and-runtimes.md)
 - [Roadmap](docs/08-roadmap.md)
 - [Entscheidungen und offene Fragen](docs/09-decisions-and-open-questions.md)
 
@@ -52,6 +52,9 @@ Besonders relevant:
 - Replies werden über persistente Nachrichten-IDs zur Ursprungssession
   geroutet.
 - Freie Nachrichten gehen ausschließlich an eine explizite Default-Session.
+- Die erste erfolgreich erstellte Session wird initial Default. Spätere
+  Sessionstarts ändern diesen Default nicht; nur der Benutzer kann ihn
+  wechseln.
 - Roundtable schreibt Nachrichten und Freigaben nicht um.
 - Agenten-APIs, Hooks und strukturierte Events dürfen höchstens optionale
   Erkennungshilfen sein und bilden keinen zweiten Nachrichtenpfad.

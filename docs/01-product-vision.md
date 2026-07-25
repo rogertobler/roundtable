@@ -135,9 +135,10 @@ Roundtable ist nicht:
 - eine Garantie, dass jede unbekannte Terminal-TUI ohne Adapter perfekt
   fernbedienbar ist.
 
-Roundtable kann Workflows koordinieren, darf aber Agentenausgaben nicht
-eigenmächtig beantworten oder Freigaben erteilen, sofern der Benutzer dies
-nicht später über eine ausdrücklich konfigurierte Regel erlaubt.
+Roundtable kann später Workflows koordinieren, darf aber Agentenausgaben nicht
+eigenmächtig beantworten und niemals selbst eine Freigabeentscheidung
+erzeugen. Ein ausdrücklich gewählter agenteneigener Berechtigungsmodus kann
+bestimmen, ob der Agent überhaupt nach einer Freigabe fragt.
 
 ## Produktprinzipien
 

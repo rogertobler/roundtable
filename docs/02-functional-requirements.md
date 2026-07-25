@@ -61,7 +61,7 @@ Vor dem Session-Start prüft Roundtable:
 - Agent ist in derselben Ausführungsumgebung wie tmux authentifiziert,
 - Modell- und Agentkonfiguration ist gültig,
 - Git-Anforderungen sind erfüllt,
-- Runtime-Backend steht zur Verfügung,
+- Session Backend steht zur Verfügung,
 - Berechtigungsprofil ist zulässig.
 
 ### FR-PROJ-004: Git-Worktrees
@@ -91,8 +91,10 @@ Optionale Auswahl:
 - bestehender oder neuer Worktree,
 - initiale Aufgabe,
 - Benachrichtigungsmodus,
-- Runtime-Backend,
 - zusätzliche erlaubte Agentenargumente.
+
+Das Session Backend wird anhand der Plattform- und Installationskonfiguration
+gewählt und ist im normalen Session-Menü keine Benutzerentscheidung.
 
 Nach Bestätigung legt Roundtable eine echte tmux-Session an, wechselt in das
 freigegebene Arbeitsverzeichnis und startet darin die ausgewählte lokal
@@ -169,6 +171,10 @@ CLI-Definitionen und Output-Erkenner können Rohzustände liefern. Der Core
 normalisiert sie auf dieses Statusmodell und speichert zusätzlich Evidenz und
 Zeitpunkt. Der Status darf den Tunnel nicht blockieren.
 
+`completed` bezeichnet den Abschluss eines Agententurns oder einer Aufgabe,
+nicht automatisch das Ende der CLI-Session. Eine weiterhin laufende
+interaktive CLI wechselt anschließend wieder zu `ready`.
+
 ### FR-SESS-006: Default-Session
 
 Pro Benutzer und Transportkontext darf höchstens eine Default-Session gelten.
@@ -187,7 +193,7 @@ eine andere Session wählen.
 ### FR-SESS-007: Bestehende Sessions
 
 Roundtable soll bestehende Sessions erkennen und übernehmen können, sofern das
-Runtime-Backend eine sichere Zuordnung und Ein-/Ausgabe erlaubt.
+Session Backend eine sichere Zuordnung und Ein-/Ausgabe erlaubt.
 
 Eine fremde tmux-Session darf nicht allein aufgrund ihres Namens übernommen
 werden. Die Übernahme erfordert Bestätigung und speichert Runtime-ID,
@@ -387,9 +393,11 @@ Eine Freigabe enthält:
 
 ### FR-INT-003: Keine automatische Entscheidung
 
-Der Standard-Core entscheidet keine Freigabe selbst. Automatische Regeln sind
-eine spätere, ausdrücklich konfigurierte Funktion und müssen enger als das
-Berechtigungsprofil der Session sein.
+Roundtable entscheidet keine Freigabe selbst und erzeugt niemals eigenständig
+eine Zustimmung oder Ablehnung. Ein beim Sessionstart ausdrücklich gewählter
+agenteneigener Berechtigungsmodus kann beeinflussen, ob die CLI eine Freigabe
+anfordert; erscheint ein Prompt, tunnelt Roundtable ausschließlich Prompt und
+Benutzerantwort.
 
 ### FR-INT-004: Genau einmal beantworten
 
@@ -433,7 +441,7 @@ Roundtable Text ohne Enter einfügen oder ausschließlich eine Taste senden.
 
 Wenn der Benutzer gleichzeitig lokal und über Telegram schreibt, serialisiert
 Roundtable nur seine eigenen Eingaben. Die UI weist auf eine aktive lokale
-Verbindung hin, sofern das Runtime-Backend sie erkennen kann.
+Verbindung hin, sofern das Session Backend sie erkennen kann.
 
 Lokale Eingaben dürfen nicht zu einem getrennten Verlauf führen. Roundtable
 beobachtet weiterhin dieselbe CLI-Ausgabe und leitet daraus entstehende
